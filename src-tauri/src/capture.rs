@@ -77,17 +77,32 @@ fn worker_loop(rx: mpsc::Receiver<()>) {
     while rx.recv().is_ok() {
         // Drain extra pending signals so we only do one cycle per burst.
         while rx.try_recv().is_ok() {}
-        match acquire_selection() {
-            Ok(Some(text)) => {
+        // Trap panics from arboard/enigo so a single bad cycle never tears
+        // down the worker thread (and through it, the whole app).
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(acquire_selection));
+        match outcome {
+            Ok(Ok(Some(text))) => {
                 if is_acceptable_selection(&text) {
                     log::info!("capture acquired: {:?}", text.trim());
-                } else {
-                    log::debug!("capture rejected: {:?}", text.trim());
                 }
             }
-            Ok(None) => log::debug!("capture: no selection"),
-            Err(e) => log::warn!("capture failed: {e}"),
+            Ok(Ok(None)) => {}
+            Ok(Err(e)) => log::warn!("capture failed: {e}"),
+            Err(payload) => {
+                let msg = panic_message(payload.as_ref());
+                log::error!("capture panicked: {msg}");
+            }
         }
+    }
+}
+
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(s) = payload.downcast_ref::<&'static str>() {
+        (*s).to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "<unknown panic payload>".to_string()
     }
 }
 
@@ -96,12 +111,8 @@ fn worker_loop(rx: mpsc::Receiver<()>) {
 fn acquire_selection() -> AppResult<Option<String>> {
     let mut cb = arboard::Clipboard::new()
         .map_err(|e| AppError::Capture(format!("clipboard open: {e}")))?;
-    let backup = cb.get_text().ok();
 
-    // Sentinel so we can tell "Ctrl+C did nothing" apart from "user selected
-    // the same text that was already on the clipboard".
-    cb.set_text(String::new())
-        .map_err(|e| AppError::Capture(format!("clipboard clear: {e}")))?;
+    let backup = cb.get_text().ok();
 
     let copy_result = simulate_copy();
 
@@ -109,15 +120,23 @@ fn acquire_selection() -> AppResult<Option<String>> {
 
     let new_text = cb.get_text().ok();
 
-    // Always restore, regardless of read/copy outcomes.
-    if let Some(prev) = backup {
-        let _ = cb.set_text(prev);
-    } else {
-        let _ = cb.clear();
+    if let Some(prev) = &backup {
+        let _ = cb.set_text(prev.clone());
     }
 
     copy_result?;
-    Ok(new_text.filter(|s| !s.is_empty()))
+
+    // Detect "nothing happened": empty read, or read equals backup => no
+    // active selection. We deliberately do not clear the clipboard first,
+    // so as not to disturb non-text clipboard payloads (images, etc.) and
+    // to avoid racing the OS clipboard chain against IME hooks.
+    let candidate = match (new_text, backup) {
+        (Some(t), _) if t.is_empty() => None,
+        (Some(t), Some(prev)) if t == prev => None,
+        (Some(t), _) => Some(t),
+        (None, _) => None,
+    };
+    Ok(candidate)
 }
 
 fn simulate_copy() -> AppResult<()> {
