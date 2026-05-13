@@ -30,23 +30,29 @@ meiqiu-dict/
     ├── Cargo.toml  build.rs  tauri.conf.json
     ├── capabilities/                   # Tauri 2 capability files
     ├── icons/  resources/              # Icons + bundled ECDICT db
-    └── src/{main,lib,error,state,config,dict,capture,hotkey,tray,window,tts,commands}.rs
+    └── src/{main,lib,error,state,config,dict,capture,selection,hotkey,tray,window,commands}.rs
 ```
 
 - Single HTML: `index.html` is shared by every window; the right Vue app is chosen by the query string `?win=main|floater|popup`.
 - Window labels must match `src-tauri/capabilities/default.json -> windows`.
+- Planned but not yet present: `src-tauri/src/tts.rs` (lands with the TTS milestone).
 
 ## Architecture
 
-- Business Rust modules (`dict`, `capture`, `hotkey`, `tray`, `tts`, `window`, `commands`) **do not import each other**. They communicate through `state.rs` (`AppState`) and Tauri events.
-- `lib.rs` is the **only assembly layer**: it registers plugins, builds `AppState`, installs the tray, registers the hotkey, and exposes commands. `main.rs` only calls `lib::run()`.
-- Errors: business modules return `AppError` (`src-tauri/src/error.rs`). `commands.rs` propagates `AppResult<T>` to the frontend with `?` (`AppError` already implements `Serialize`).
+- Module tiers (only `lib.rs` wires them together):
+  - **Infrastructure** (`state`, `error`, `config`): anyone may import.
+  - **Utility** (`selection`, `window`): pure helpers; anyone may import. New utility modules must stay pure (no `AppState`, no `AppHandle`, except as parameters).
+  - **Business** (`dict`, `capture`, `hotkey`, `tray`, `tts`): **do not import each other**. They communicate through `AppState` and Tauri events.
+  - **IPC boundary** (`commands`): the only Rust code the frontend reaches via `invoke`. It is allowed to call into business modules; nothing imports `commands`.
+  - **Assembly** (`lib`, `main`): the only place that registers plugins, builds `AppState`, installs the tray, registers the hotkey, and exposes commands. `main.rs` only calls `lib::run()`.
+- Pattern: pure function + thin Tauri adapter. Examples: `dict::lookup_conn` (pure) / `dict::lookup` (pool adapter); `window::clamp_rect` (pure) / `window::clamp_to_monitor` (Tauri adapter). Unit-test the pure half; the adapter stays thin.
+- Errors: business code returns `AppError` (`src-tauri/src/error.rs`). `commands.rs` propagates `AppResult<T>` to the frontend with `?` (`AppError` already implements `Serialize`).
 - Config: `config.rs` is the only place that reads and writes `%APPDATA%\com.meiqiu.dict\config.json`. Other modules take snapshots via `AppState::config()`.
 - Capture pipeline is strictly one-way: `mouseup -> back up clipboard -> simulate Ctrl+C -> read -> restore -> floater -> click -> popup`. Any failed step must restore the clipboard and reset state.
 - Multi-language support keeps **only three cheap seams**, never a full abstraction:
   1. `DictEntry.lang_pair: &str`
   2. SQLite columns `lang_src TEXT, lang_tgt TEXT`
-  3. `capture.rs::is_acceptable_selection()`
+  3. `selection.rs::is_acceptable_selection()`
 - Frontend shared layer `src-ui/shared/`: all IPC goes through `shared/ipc.ts`; components must not call `invoke()` directly. Type definitions live in `shared/types.ts` and match Rust `serde` structs one-to-one.
 - Window strategy: main, floater, and popup are independent `WebviewWindow` instances. No iframes, no webview reuse across logical windows.
 
@@ -146,7 +152,10 @@ Detailed decisions live in `/memories/repo/meiqiu-dict.md`.
 - `src-tauri/capabilities/default.json -> windows` must list every allowed window label. Forgetting a new label causes "window not allowed" command errors.
 - `include_bytes!` paths are relative to the source file, not the crate root.
 - The ECDICT db must be declared in `tauri.conf.json -> bundle.resources` and must already exist on disk before `pnpm tauri build`. The file is gitignored and produced by `pnpm dict`; see the `Commands` section.
+- The ECDICT `translation` column stores newlines as the literal two-character sequence `\n`. Unescape at the `dict.rs` boundary so every caller sees real newlines.
 - rdev's Windows mouse hook runs on its own thread. Callbacks must not capture non-`Send` data.
+- Window sizes in `tauri.conf.json` (`width`, `height`) are logical pixels (DIP). `WebviewWindow::set_position` takes physical pixels. When computing positions or clamping, query `WebviewWindow::outer_size()` for the actual physical size; do not assume the config values match.
+- A window declared with `alwaysOnTop: true` and `focus: false` will still sink under the Windows taskbar after `show()` because the Z-order is decided by recency of activation. Re-assert `win.set_always_on_top(true)` after `win.show()` to force the topmost stack to refresh.
 - With one HTML serving multiple windows, every webview is independent. Pinia store instances are not shared; cross-window communication goes through Tauri events.
 - Do not install `@tauri-apps/cli` globally. Always use the project-local copy via `pnpm tauri` to avoid version drift.
 
