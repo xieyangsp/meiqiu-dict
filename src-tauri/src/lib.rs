@@ -61,7 +61,7 @@ pub fn run() {
 
             tray::build(handle)?;
             hotkey::register(handle, &hotkey)?;
-            if let Err(e) = capture::start_listener(state.clone()) {
+            if let Err(e) = capture::start_listener(handle.clone(), state.clone()) {
                 log::warn!("capture listener start failed: {e}");
             }
 

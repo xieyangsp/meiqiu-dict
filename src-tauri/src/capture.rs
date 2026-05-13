@@ -1,6 +1,6 @@
 // Mouse listener + clipboard cycle. When capture is enabled and the user
 // releases the left mouse button, simulate Ctrl+C, read the selection,
-// restore the previous clipboard, and log accepted candidates.
+// position the floater near the cursor, show it, and emit the text payload.
 //
 // rdev::listen blocks for the process lifetime and runs on its own OS thread.
 // Its callback must stay non-blocking, so we offload the clipboard cycle to
@@ -13,6 +13,8 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 use rdev::{Button, Event, EventType, listen};
+use serde::Serialize;
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, Runtime};
 
 use crate::error::{AppError, AppResult};
 use crate::selection::is_acceptable_selection;
@@ -26,20 +28,36 @@ const THROTTLE: Duration = Duration::from_millis(200);
 /// application needs time to populate CF_UNICODETEXT.
 const COPY_SETTLE: Duration = Duration::from_millis(80);
 
-/// Spawn the rdev listener thread and the clipboard-cycle worker thread.
-pub fn start_listener(state: Arc<AppState>) -> AppResult<()> {
-    let (tx, rx) = mpsc::channel::<()>();
+/// Floater is shown slightly offset from the cursor so it does not sit under
+/// the pointer.
+const FLOATER_OFFSET: i32 = 12;
 
+const FLOATER_LABEL: &str = "floater";
+
+#[derive(Clone, Serialize)]
+struct SelectionPayload<'a> {
+    text: &'a str,
+}
+
+/// Spawn the rdev listener thread and the clipboard-cycle worker thread.
+pub fn start_listener<R: Runtime>(app: AppHandle<R>, state: Arc<AppState>) -> AppResult<()> {
+    let cursor: Arc<Mutex<(i32, i32)>> = Arc::new(Mutex::new((0, 0)));
+    let (tx, rx) = mpsc::channel::<(i32, i32)>();
+
+    let app_worker = app.clone();
     thread::Builder::new()
         .name("capture-worker".into())
-        .spawn(move || worker_loop(rx))
+        .spawn(move || worker_loop(rx, app_worker))
         .map_err(|e| AppError::Capture(format!("spawn worker: {e}")))?;
 
     let last_emit: Arc<Mutex<Option<Instant>>> = Arc::new(Mutex::new(None));
+    let cursor_listener = cursor.clone();
     thread::Builder::new()
         .name("capture-listener".into())
         .spawn(move || {
-            if let Err(e) = listen(move |event| handle(event, &state, &last_emit, &tx)) {
+            if let Err(e) = listen(move |event| {
+                handle(event, &state, &last_emit, &tx, &cursor_listener)
+            }) {
                 log::error!("rdev listen failed: {e:?}");
             }
         })
@@ -51,39 +69,49 @@ fn handle(
     event: Event,
     state: &AppState,
     last_emit: &Mutex<Option<Instant>>,
-    tx: &mpsc::Sender<()>,
+    tx: &mpsc::Sender<(i32, i32)>,
+    cursor: &Mutex<(i32, i32)>,
 ) {
-    let EventType::ButtonRelease(Button::Left) = event.event_type else {
-        return;
-    };
-    if !state.capture_enabled() {
-        return;
-    }
-    let now = Instant::now();
-    let mut guard = last_emit.lock();
-    if let Some(prev) = *guard {
-        if now.duration_since(prev) < THROTTLE {
-            return;
+    match event.event_type {
+        EventType::MouseMove { x, y } => {
+            *cursor.lock() = (x as i32, y as i32);
         }
-    }
-    *guard = Some(now);
-    drop(guard);
-    if tx.send(()).is_err() {
-        log::warn!("capture worker channel closed");
+        EventType::ButtonRelease(Button::Left) => {
+            if !state.capture_enabled() {
+                return;
+            }
+            let now = Instant::now();
+            let mut guard = last_emit.lock();
+            if let Some(prev) = *guard {
+                if now.duration_since(prev) < THROTTLE {
+                    return;
+                }
+            }
+            *guard = Some(now);
+            drop(guard);
+            let pos = *cursor.lock();
+            if tx.send(pos).is_err() {
+                log::warn!("capture worker channel closed");
+            }
+        }
+        _ => {}
     }
 }
 
-fn worker_loop(rx: mpsc::Receiver<()>) {
-    while rx.recv().is_ok() {
+fn worker_loop<R: Runtime>(rx: mpsc::Receiver<(i32, i32)>, app: AppHandle<R>) {
+    while let Ok(mut pos) = rx.recv() {
         // Drain extra pending signals so we only do one cycle per burst.
-        while rx.try_recv().is_ok() {}
-        // Trap panics from arboard/enigo so a single bad cycle never tears
-        // down the worker thread (and through it, the whole app).
+        // Keep the most recent cursor position.
+        while let Ok(next) = rx.try_recv() {
+            pos = next;
+        }
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(acquire_selection));
         match outcome {
             Ok(Ok(Some(text))) => {
-                if is_acceptable_selection(&text) {
-                    log::info!("capture acquired: {:?}", text.trim());
+                let trimmed = text.trim();
+                if is_acceptable_selection(trimmed) {
+                    log::info!("capture acquired: {trimmed:?}");
+                    show_floater(&app, trimmed, pos);
                 }
             }
             Ok(Ok(None)) => {}
@@ -103,6 +131,24 @@ fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
         s.clone()
     } else {
         "<unknown panic payload>".to_string()
+    }
+}
+
+/// Reposition the floater near the cursor and emit the selection text.
+fn show_floater<R: Runtime>(app: &AppHandle<R>, text: &str, (x, y): (i32, i32)) {
+    let Some(win) = app.get_webview_window(FLOATER_LABEL) else {
+        log::warn!("floater window not found");
+        return;
+    };
+    let target = PhysicalPosition::new(x + FLOATER_OFFSET, y + FLOATER_OFFSET);
+    if let Err(e) = win.set_position(tauri::Position::Physical(target)) {
+        log::warn!("floater set_position: {e}");
+    }
+    if let Err(e) = win.show() {
+        log::warn!("floater show: {e}");
+    }
+    if let Err(e) = app.emit_to(FLOATER_LABEL, "selection-acquired", SelectionPayload { text }) {
+        log::warn!("floater emit: {e}");
     }
 }
 
