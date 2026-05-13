@@ -93,6 +93,29 @@ meiqiu-dict/
 - User says "commit": current-conversation changes only. "commit all": every pending change, grouped sensibly. "push": optionally `git pull --rebase` first.
 - Do not delete or rename unexpected files. Ask if it blocks progress; otherwise leave them alone.
 
+### PR titles
+
+PRs squash-merge into `main`, so the PR title becomes the commit message on `main`. Follow Conventional Commits:
+
+- Format: `<type>(<scope>)?: <subject>`
+- Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `build`, `ci`, `perf`, `style`
+- Scope is optional and names a module (`tray`, `hotkey`, `dict`, `capture`, `agents`, etc.)
+- Subject: lowercase except proper nouns (`Tauri`, `ECDICT`, `煤球` etc.); imperative mood (`add`, not `added`/`adds`); no trailing period
+- Length: keep the whole title <= 72 characters
+- Breaking changes: append `!` after type/scope, e.g. `feat(config)!: rename autostart key`
+- Never embed phase or milestone identifiers (`PR-1`, `M2`, `Phase 0`); see `Code`
+- No emoji
+
+Examples:
+
+```
+feat(tray): show 煤球 sleeping when capture disabled
+fix(hotkey): restore clipboard if Ctrl+C simulation fails
+chore: bump tauri to 2.3
+refactor(state): replace RwLock with Mutex
+docs(agents): add PR title convention
+```
+
 ## Docs / Memory
 
 - Long-lived planning and historical decisions live in **AI memory** (`/memories/repo/meiqiu-dict.md`), not in repo markdown. Do not commit `PLAN.md`, `ROADMAP.md`, or change-log style files unless explicitly requested.
