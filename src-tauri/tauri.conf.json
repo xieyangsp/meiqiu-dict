@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0",
+  "productName": "MeiQiuDict",
+  "version": "0.1.0",
+  "identifier": "com.meiqiu.dict",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "煤球词典",
+        "url": "index.html?win=main",
+        "width": 900,
+        "height": 600,
+        "minWidth": 600,
+        "minHeight": 400,
+        "visible": false,
+        "decorations": true,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "resources": [],
+    "category": "Utility"
+  }
+}

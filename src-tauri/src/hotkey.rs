@@ -1,0 +1,39 @@
+// Global hotkey: toggle capture_enabled and sync the tray on each press.
+
+use std::str::FromStr;
+use std::sync::Arc;
+
+use tauri::{AppHandle, Manager, Runtime};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+
+use crate::error::{AppError, AppResult};
+use crate::state::AppState;
+use crate::tray;
+
+pub fn register<R: Runtime>(app: &AppHandle<R>, accelerator: &str) -> AppResult<()> {
+    let shortcut = Shortcut::from_str(accelerator)
+        .map_err(|e| AppError::Hotkey(format!("failed to parse accelerator {accelerator}: {e}")))?;
+    let gs = app.global_shortcut();
+    if gs.is_registered(shortcut) {
+        gs.unregister(shortcut)
+            .map_err(|e| AppError::Hotkey(e.to_string()))?;
+    }
+    gs.on_shortcut(shortcut, on_triggered)
+        .map_err(|e| AppError::Hotkey(e.to_string()))?;
+    Ok(())
+}
+
+fn on_triggered<R: Runtime>(app: &AppHandle<R>, _shortcut: &Shortcut, event: tauri_plugin_global_shortcut::ShortcutEvent) {
+    // Only react on key-down; ignore key-up.
+    if event.state() != ShortcutState::Pressed {
+        return;
+    }
+    let Some(state) = app.try_state::<Arc<AppState>>() else {
+        return;
+    };
+    let enabled = state.toggle_capture();
+    log::info!("hotkey toggled capture: enabled={enabled}");
+    if let Err(e) = tray::sync(app, enabled) {
+        log::warn!("failed to sync tray after hotkey: {e}");
+    }
+}
