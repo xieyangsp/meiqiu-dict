@@ -10,6 +10,7 @@ mod hotkey;
 mod selection;
 mod state;
 mod tray;
+mod window;
 
 use std::sync::Arc;
 
