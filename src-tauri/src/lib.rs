@@ -7,6 +7,7 @@ mod config;
 mod dict;
 mod error;
 mod hotkey;
+mod selection;
 mod state;
 mod tray;
 

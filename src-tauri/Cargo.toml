@@ -32,6 +32,8 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 r2d2 = "0.8"
 r2d2_sqlite = "0.25"
 rdev = "0.5"
+arboard = "3.4"
+enigo = "0.3"
 
 [profile.release]
 panic = "abort"
