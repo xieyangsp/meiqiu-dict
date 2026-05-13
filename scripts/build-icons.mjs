@@ -1,136 +1,70 @@
-// Placeholder icon generator. Produces:
-//   src-tauri/icons/icon-256.png  icon-512.png  icon-1024.png  icon.ico
-//   src-tauri/icons/tray-active.png  tray-idle.png  (32x32)
-// Uses Node built-ins only. Replace source.png with the real artwork and
-// drop this script afterwards.
+// Icon pipeline. Reads two source PNGs and emits every size Tauri and the
+// tray need.
+//
+// Sources (square, RGBA, ideally >= 1024):
+//   src-tauri/icons/source-active.png   (active / "capture on" / app brand)
+//   src-tauri/icons/source-idle.png     (idle / "capture off")
+//
+// Outputs (all under src-tauri/icons/):
+//   icon-256.png  icon-512.png  icon-1024.png            (raw scaled exports)
+//   32x32.png  128x128.png  128x128@2x.png  icon.png     (Tauri bundle defaults)
+//   icon.ico                                             (Windows multi-size)
+//   tray-active.png  tray-idle.png                       (32x32 tray)
 
-import { deflateSync } from 'node:zlib';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import sharp from 'sharp';
+import pngToIco from 'png-to-ico';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const outDir = resolve(__dirname, '..', 'src-tauri', 'icons');
-mkdirSync(outDir, { recursive: true });
+const iconsDir = resolve(__dirname, '..', 'src-tauri', 'icons');
+mkdirSync(iconsDir, { recursive: true });
 
-// ---- PNG encoder (zero deps) ----
+const sourceActive = resolve(iconsDir, 'source-active.png');
+const sourceIdle = resolve(iconsDir, 'source-idle.png');
 
-function crc32(buf) {
-  let c;
-  if (!crc32.table) {
-    const t = new Uint32Array(256);
-    for (let n = 0; n < 256; n++) {
-      c = n;
-      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-      t[n] = c >>> 0;
-    }
-    crc32.table = t;
-  }
-  let crc = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) crc = (crc >>> 8) ^ crc32.table[(crc ^ buf[i]) & 0xff];
-  return (crc ^ 0xffffffff) >>> 0;
+// Sources are pre-scaled pixel art at 2048; lanczos preserves features when
+// shrinking, nearest would lose tiny details like the mouth at 32x32.
+const RESIZE_OPTS = { kernel: sharp.kernel.lanczos3, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } };
+
+async function exportPng(source, size, outName) {
+  const out = resolve(iconsDir, outName);
+  await sharp(source).resize(size, size, RESIZE_OPTS).png({ compressionLevel: 9 }).toFile(out);
+  console.log('wrote', out);
 }
 
-function chunk(type, data) {
-  const len = Buffer.alloc(4);
-  len.writeUInt32BE(data.length, 0);
-  const typeBuf = Buffer.from(type, 'ascii');
-  const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0);
-  return Buffer.concat([len, typeBuf, data, crc]);
+async function exportIco(source, sizes, outName) {
+  // png-to-ico accepts an array of PNG buffers, one per embedded size.
+  const buffers = await Promise.all(
+    sizes.map((s) => sharp(source).resize(s, s, RESIZE_OPTS).png({ compressionLevel: 9 }).toBuffer()),
+  );
+  const ico = await pngToIco(buffers);
+  const out = resolve(iconsDir, outName);
+  writeFileSync(out, ico);
+  console.log('wrote', out);
 }
 
-function encodePng(width, height, rgba) {
-  const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8;   // bit depth
-  ihdr[9] = 6;   // color type: RGBA
-  ihdr[10] = 0;
-  ihdr[11] = 0;
-  ihdr[12] = 0;
-  const stride = width * 4;
-  const filtered = Buffer.alloc((stride + 1) * height);
-  for (let y = 0; y < height; y++) {
-    filtered[y * (stride + 1)] = 0;
-    rgba.copy(filtered, y * (stride + 1) + 1, y * stride, y * stride + stride);
-  }
-  const idat = deflateSync(filtered);
-  return Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', Buffer.alloc(0))]);
+async function main() {
+  // App icon set: derive from active variant.
+  await exportPng(sourceActive, 256, 'icon-256.png');
+  await exportPng(sourceActive, 512, 'icon-512.png');
+  await exportPng(sourceActive, 1024, 'icon-1024.png');
+
+  // Tauri bundle defaults.
+  await exportPng(sourceActive, 32, '32x32.png');
+  await exportPng(sourceActive, 128, '128x128.png');
+  await exportPng(sourceActive, 256, '128x128@2x.png');
+  await exportPng(sourceActive, 512, 'icon.png');
+
+  // Windows multi-size ICO.
+  await exportIco(sourceActive, [16, 24, 32, 48, 64, 128, 256], 'icon.ico');
+
+  // Tray two-state icons.
+  await exportPng(sourceActive, 32, 'tray-active.png');
+  await exportPng(sourceIdle, 32, 'tray-idle.png');
 }
 
-// ---- Pixel generation ----
+await main();
 
-function fillCircle(size, [r, g, b]) {
-  const buf = Buffer.alloc(size * size * 4, 0);
-  const cx = (size - 1) / 2;
-  const cy = (size - 1) / 2;
-  const radius = size / 2 - 0.5;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const dx = x - cx;
-      const dy = y - cy;
-      const d = Math.sqrt(dx * dx + dy * dy);
-      // Edge anti-alias: 1px gradient at the rim.
-      const edge = radius - d;
-      let alpha;
-      if (edge >= 1) alpha = 255;
-      else if (edge <= 0) alpha = 0;
-      else alpha = Math.round(edge * 255);
-      const i = (y * size + x) * 4;
-      buf[i] = r;
-      buf[i + 1] = g;
-      buf[i + 2] = b;
-      buf[i + 3] = alpha;
-    }
-  }
-  return buf;
-}
-
-// ---- ICO wrapper (embeds a PNG) ----
-
-function encodeIco(pngBuf, size) {
-  const header = Buffer.alloc(6);
-  header.writeUInt16LE(0, 0);   // reserved
-  header.writeUInt16LE(1, 2);   // type icon
-  header.writeUInt16LE(1, 4);   // count
-  const entry = Buffer.alloc(16);
-  entry[0] = size >= 256 ? 0 : size;
-  entry[1] = size >= 256 ? 0 : size;
-  entry[2] = 0; // palette
-  entry[3] = 0; // reserved
-  entry.writeUInt16LE(1, 4);    // planes
-  entry.writeUInt16LE(32, 6);   // bit count
-  entry.writeUInt32LE(pngBuf.length, 8);
-  entry.writeUInt32LE(22, 12);  // offset
-  return Buffer.concat([header, entry, pngBuf]);
-}
-
-// ---- Write files ----
-
-const BLACK = [20, 20, 20];
-const GRAY = [160, 160, 160];
-
-function write(name, buf) {
-  const p = resolve(outDir, name);
-  writeFileSync(p, buf);
-  console.log('wrote', p);
-}
-
-// App icon (active dark variant)
-for (const size of [256, 512, 1024]) {
-  write(`icon-${size}.png`, encodePng(size, size, fillCircle(size, BLACK)));
-}
-const ico256 = encodePng(256, 256, fillCircle(256, BLACK));
-write('icon.ico', encodeIco(ico256, 256));
-
-// Default sizes Tauri expects.
-write('32x32.png', encodePng(32, 32, fillCircle(32, BLACK)));
-write('128x128.png', encodePng(128, 128, fillCircle(128, BLACK)));
-write('128x128@2x.png', encodePng(256, 256, fillCircle(256, BLACK)));
-write('icon.png', encodePng(512, 512, fillCircle(512, BLACK)));
-
-// Tray two-state icons.
-write('tray-active.png', encodePng(32, 32, fillCircle(32, BLACK)));
-write('tray-idle.png', encodePng(32, 32, fillCircle(32, GRAY)));
