@@ -13,6 +13,9 @@ pub enum AppError {
     #[error("tray error: {0}")]
     Tray(String),
 
+    #[error("dict error: {0}")]
+    Dict(String),
+
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 

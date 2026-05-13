@@ -56,8 +56,8 @@ meiqiu-dict/
 - Install: `pnpm install`.
 - Dev: `pnpm tauri dev` (starts Vite and Cargo automatically).
 - Build: `pnpm tauri build` (NSIS installer; see `tauri.conf.json -> bundle.targets`).
-- Icons: `pnpm icons` runs the placeholder generator. Delete the script once a real source image lands in `src-tauri/icons/`.
-- Dictionary (later phase): `node scripts/build-dict.mjs` converts ECDICT into `src-tauri/resources/ecdict.db`.
+- Icons: `pnpm icons` regenerates app and tray PNG/ICO outputs from `src-tauri/icons/source-active.png` and `source-idle.png`.
+- Dictionary data: put the ECDICT csv at `scripts/data/ecdict.csv` (https://github.com/skywind3000/ECDICT), then `pnpm dict` produces `src-tauri/resources/ecdict.db` (~45 MiB, ~770k rows). Both files are gitignored. `pnpm dict` must run once before `pnpm tauri build`, otherwise the bundler fails because `bundle.resources` points at a missing file. `pnpm tauri dev` tolerates a missing db: the app logs a warning and `dict_lookup` returns an error, the rest of the app still runs.
 - Frontend typecheck: `pnpm build` runs `vue-tsc --noEmit`. Standalone: `pnpm exec vue-tsc --noEmit`.
 - Rust checks: `cd src-tauri && cargo check`; tests: `cargo test`; format: `cargo fmt`; lint: `cargo clippy --all-targets -- -D warnings`.
 
@@ -67,7 +67,7 @@ meiqiu-dict/
 - Errors: business code returns `AppResult<T>` (`crate::error::AppResult`). No `unwrap()` or `expect()` outside the assembly path in `lib.rs::run`, and there only when failure should crash the process.
 - Logging: `tauri-plugin-log` plus the `log` facade. Do not mix in `tracing`, `println!`, or `eprintln!`.
 - Concurrency: shared state uses `parking_lot::{Mutex, RwLock}`. Do not mix with `std::sync` equivalents.
-- Resources: small static assets (icons) ship through `include_bytes!`. Large data (ECDICT db) ships via `tauri.conf.json -> bundle.resources` and is resolved at runtime with `app.path().resource_dir()`.
+- Resources: small static assets (icons) ship through `include_bytes!`. Large data (ECDICT db) ships via `tauri.conf.json -> bundle.resources` and is resolved at runtime with `app.path().resolve("resources/ecdict.db", BaseDirectory::Resource)`. The same call returns the dev copy under `target/<profile>/resources/` and the installed copy under `<Install>/resources/`.
 - TypeScript: strict everywhere. Frontend types come from `shared/types.ts` only; do not redeclare Rust structs inside components.
 - Vue: `<script setup lang="ts">` only. No Options API.
 - Styling: Tailwind utilities by default. For richer components, copy shadcn-vue primitives into `src-ui/shared/ui/` on demand. Never install the full shadcn-vue package.
@@ -145,13 +145,13 @@ Detailed decisions live in `/memories/repo/meiqiu-dict.md`.
 - `tauri-plugin-global-shortcut` accelerator strings are case sensitive (`CommandOrControl`, `Alt`, `Shift`). Capitalization mismatches cause parse failures.
 - `src-tauri/capabilities/default.json -> windows` must list every allowed window label. Forgetting a new label causes "window not allowed" command errors.
 - `include_bytes!` paths are relative to the source file, not the crate root.
-- The ECDICT db must be declared in `tauri.conf.json -> bundle.resources`, otherwise it is missing from the packaged build.
+- The ECDICT db must be declared in `tauri.conf.json -> bundle.resources` and must already exist on disk before `pnpm tauri build`. The file is gitignored and produced by `pnpm dict`; see the `Commands` section.
 - rdev's Windows mouse hook runs on its own thread. Callbacks must not capture non-`Send` data.
 - With one HTML serving multiple windows, every webview is independent. Pinia store instances are not shared; cross-window communication goes through Tauri events.
 - Do not install `@tauri-apps/cli` globally. Always use the project-local copy via `pnpm tauri` to avoid version drift.
 
 ## User-owned TODOs (do not auto-execute)
 
-- Provide a 煤球 portrait PNG at >= 512x512 to replace the placeholder icons in `src-tauri/icons/`.
 - Install Rust stable >= 1.85 (`winget install Rustlang.Rustup`, then `rustup default stable`).
 - Install pnpm (`npm install -g pnpm`).
+- Download the ECDICT csv to `scripts/data/ecdict.csv` (gitignored), then run `pnpm dict` to materialize `src-tauri/resources/ecdict.db` before the first `pnpm tauri build`.
