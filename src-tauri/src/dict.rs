@@ -68,9 +68,15 @@ pub fn lookup_conn(conn: &Connection, word: &str) -> AppResult<Option<DictEntry>
     Ok(row.map(|(phonetic, translation, src, tgt)| DictEntry {
         word: key,
         phonetic,
-        translation,
+        translation: unescape_translation(&translation),
         lang_pair: format!("{src}-{tgt}"),
     }))
+}
+
+/// ECDICT stores newlines as the literal two-character sequence `\n`.
+/// Convert them to real newlines so the UI can render multi-line entries.
+fn unescape_translation(raw: &str) -> String {
+    raw.replace("\\n", "\n")
 }
 
 #[cfg(test)]
@@ -120,5 +126,23 @@ mod tests {
     fn empty_query_returns_none() {
         let conn = fixture();
         assert!(lookup_conn(&conn, "   ").unwrap().is_none());
+    }
+
+    #[test]
+    fn translation_newlines_are_unescaped() {
+        let conn = Connection::open_in_memory().expect("open mem");
+        conn.execute_batch(
+            "CREATE TABLE entries (
+                word TEXT PRIMARY KEY,
+                phonetic TEXT NOT NULL DEFAULT '',
+                translation TEXT NOT NULL DEFAULT '',
+                lang_src TEXT NOT NULL,
+                lang_tgt TEXT NOT NULL
+            ) WITHOUT ROWID;
+            INSERT INTO entries VALUES ('run', '', 'n. 跑\\nvt. 经营', 'en', 'zh');",
+        )
+        .expect("seed");
+        let entry = lookup_conn(&conn, "run").unwrap().expect("found");
+        assert_eq!(entry.translation, "n. 跑\nvt. 经营");
     }
 }

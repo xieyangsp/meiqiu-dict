@@ -32,7 +32,10 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![commands::dict_lookup])
+        .invoke_handler(tauri::generate_handler![
+            commands::dict_lookup,
+            commands::request_lookup
+        ])
         .setup(|app| {
             let handle = app.handle();
 

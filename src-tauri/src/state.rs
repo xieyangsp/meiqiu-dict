@@ -17,6 +17,7 @@ struct Inner {
     config: AppConfig,
     capture_enabled: bool,
     dict: Option<DictPool>,
+    last_cursor: Option<(i32, i32)>,
 }
 
 impl AppState {
@@ -26,6 +27,7 @@ impl AppState {
                 config,
                 capture_enabled: false,
                 dict: None,
+                last_cursor: None,
             }),
         })
     }
@@ -56,5 +58,13 @@ impl AppState {
     /// Clone of the pool handle (r2d2::Pool is internally Arc).
     pub fn dict(&self) -> Option<DictPool> {
         self.inner.read().dict.clone()
+    }
+
+    pub fn set_last_cursor(&self, pos: (i32, i32)) {
+        self.inner.write().last_cursor = Some(pos);
+    }
+
+    pub fn last_cursor(&self) -> Option<(i32, i32)> {
+        self.inner.read().last_cursor
     }
 }
