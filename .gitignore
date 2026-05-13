@@ -11,6 +11,7 @@ src-tauri/gen/
 
 # Generated artifacts
 src-tauri/resources/ecdict.db
+scripts/data/
 
 # OS / editors
 .DS_Store

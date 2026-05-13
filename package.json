@@ -8,7 +8,8 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "icons": "node scripts/build-icons.mjs"
+    "icons": "node scripts/build-icons.mjs",
+    "dict": "node scripts/build-dict.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.2.0",
@@ -28,6 +29,7 @@
     "@tauri-apps/cli": "^2.2.0",
     "@vitejs/plugin-vue": "^5.2.1",
     "autoprefixer": "^10.4.20",
+    "csv-parse": "^5.5.6",
     "png-to-ico": "^2.1.8",
     "postcss": "^8.4.49",
     "sharp": "^0.33.5",

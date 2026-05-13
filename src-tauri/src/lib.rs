@@ -1,7 +1,9 @@
 // Library entry: assembles plugins, state, tray, and the hotkey.
 // Tauri 2 idiom: startup lives in lib; main only calls run().
 
+mod commands;
 mod config;
+mod dict;
 mod error;
 mod hotkey;
 mod state;
@@ -10,6 +12,7 @@ mod tray;
 use std::sync::Arc;
 
 use tauri::Manager;
+use tauri::path::BaseDirectory;
 use tauri_plugin_log::{Target, TargetKind};
 
 use crate::state::AppState;
@@ -27,6 +30,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .invoke_handler(tauri::generate_handler![commands::dict_lookup])
         .setup(|app| {
             let handle = app.handle();
 
@@ -36,7 +40,22 @@ pub fn run() {
             });
             let hotkey = cfg.hotkey.clone();
             let state = AppState::new(cfg);
-            app.manage::<Arc<AppState>>(state);
+            app.manage::<Arc<AppState>>(state.clone());
+
+            // Bundled dictionary lives at <resource>/resources/ecdict.db.
+            match handle
+                .path()
+                .resolve("resources/ecdict.db", BaseDirectory::Resource)
+            {
+                Ok(db_path) => match dict::open(&db_path) {
+                    Ok(pool) => {
+                        state.set_dict(pool);
+                        log::info!("dict pool open: {}", db_path.display());
+                    }
+                    Err(e) => log::warn!("dict pool open failed: {e}"),
+                },
+                Err(e) => log::warn!("resolve ecdict.db path failed: {e}"),
+            }
 
             tray::build(handle)?;
             hotkey::register(handle, &hotkey)?;

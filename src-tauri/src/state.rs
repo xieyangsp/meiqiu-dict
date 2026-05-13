@@ -5,6 +5,7 @@ use parking_lot::RwLock;
 use std::sync::Arc;
 
 use crate::config::AppConfig;
+use crate::dict::DictPool;
 
 #[derive(Default)]
 pub struct AppState {
@@ -15,6 +16,7 @@ pub struct AppState {
 struct Inner {
     config: AppConfig,
     capture_enabled: bool,
+    dict: Option<DictPool>,
 }
 
 impl AppState {
@@ -23,6 +25,7 @@ impl AppState {
             inner: RwLock::new(Inner {
                 config,
                 capture_enabled: false,
+                dict: None,
             }),
         })
     }
@@ -44,5 +47,14 @@ impl AppState {
         let mut g = self.inner.write();
         g.capture_enabled = !g.capture_enabled;
         g.capture_enabled
+    }
+
+    pub fn set_dict(&self, pool: DictPool) {
+        self.inner.write().dict = Some(pool);
+    }
+
+    /// Clone of the pool handle (r2d2::Pool is internally Arc).
+    pub fn dict(&self) -> Option<DictPool> {
+        self.inner.read().dict.clone()
     }
 }
