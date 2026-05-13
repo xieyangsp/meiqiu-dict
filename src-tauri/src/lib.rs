@@ -1,6 +1,7 @@
 // Library entry: assembles plugins, state, tray, and the hotkey.
 // Tauri 2 idiom: startup lives in lib; main only calls run().
 
+mod capture;
 mod commands;
 mod config;
 mod dict;
@@ -59,6 +60,9 @@ pub fn run() {
 
             tray::build(handle)?;
             hotkey::register(handle, &hotkey)?;
+            if let Err(e) = capture::start_listener(state.clone()) {
+                log::warn!("capture listener start failed: {e}");
+            }
 
             log::info!("meiqiu-dict started, hotkey={hotkey}");
             Ok(())

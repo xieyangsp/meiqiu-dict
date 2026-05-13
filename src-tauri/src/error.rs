@@ -16,6 +16,9 @@ pub enum AppError {
     #[error("dict error: {0}")]
     Dict(String),
 
+    #[error("capture error: {0}")]
+    Capture(String),
+
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 
