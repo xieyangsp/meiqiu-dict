@@ -1,9 +1,62 @@
 <script setup lang="ts">
-// Floater window placeholder (the small bubble shown after a selection).
+// Small bubble shown near the cursor after a selection. Backend positions
+// and shows the window; this component fills in the text and hides itself
+// on click or after a timeout. Lookup wiring lands with the popup window.
+
+import { onMounted, onUnmounted, ref } from 'vue';
+import type { UnlistenFn } from '@tauri-apps/api/event';
+
+import { hideCurrentWindow, onSelectionAcquired } from '../shared/ipc';
+
+const AUTO_HIDE_MS = 3000;
+
+const text = ref('');
+let unlisten: UnlistenFn | null = null;
+let hideTimer: number | null = null;
+
+function scheduleHide() {
+  if (hideTimer !== null) {
+    window.clearTimeout(hideTimer);
+  }
+  hideTimer = window.setTimeout(() => {
+    void hideCurrentWindow();
+  }, AUTO_HIDE_MS);
+}
+
+function onClick() {
+  // Phase 3d will dispatch a lookup request here. For now just dismiss.
+  if (hideTimer !== null) {
+    window.clearTimeout(hideTimer);
+    hideTimer = null;
+  }
+  void hideCurrentWindow();
+}
+
+onMounted(async () => {
+  unlisten = await onSelectionAcquired((payload) => {
+    text.value = payload.text;
+    scheduleHide();
+  });
+});
+
+onUnmounted(() => {
+  if (unlisten) {
+    unlisten();
+  }
+  if (hideTimer !== null) {
+    window.clearTimeout(hideTimer);
+  }
+});
 </script>
 
 <template>
   <div class="flex h-full w-full items-center justify-center">
-    <button class="rounded-full bg-neutral-900/85 px-3 py-1 text-xs text-white shadow">查</button>
+    <button
+      :title="text"
+      class="rounded-full bg-neutral-900/85 px-3 py-1 text-xs text-white shadow hover:bg-neutral-700"
+      @click="onClick"
+    >
+      查
+    </button>
   </div>
 </template>
