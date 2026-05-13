@@ -29,20 +29,59 @@ const sourceIdle = resolve(iconsDir, 'source-idle.png');
 // shrinking, nearest would lose tiny details like the mouth at 32x32.
 const RESIZE_OPTS = { kernel: sharp.kernel.lanczos3, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } };
 
+// Tray active-state circle background. Purple stands out against typical
+// dark/light taskbars; idle has no background so the two states differ
+// strongly even at 16-24px.
+const TRAY_ACTIVE_CIRCLE = '#8b5cf6';
+
+// App icons trim the transparent margin and scale so the longer side
+// fills the canvas; fit:'contain' pads the shorter side with transparency.
+// The dog face is wider than tall, so without trim every export ends up
+// shrunk to fit a square inner area.
+function tightPipeline(source, size) {
+  return sharp(source).trim().resize(size, size, RESIZE_OPTS);
+}
+
 async function exportPng(source, size, outName) {
   const out = resolve(iconsDir, outName);
-  await sharp(source).resize(size, size, RESIZE_OPTS).png({ compressionLevel: 9 }).toFile(out);
+  await tightPipeline(source, size).png({ compressionLevel: 9 }).toFile(out);
   console.log('wrote', out);
 }
 
 async function exportIco(source, sizes, outName) {
   // png-to-ico accepts an array of PNG buffers, one per embedded size.
   const buffers = await Promise.all(
-    sizes.map((s) => sharp(source).resize(s, s, RESIZE_OPTS).png({ compressionLevel: 9 }).toBuffer()),
+    sizes.map((s) => tightPipeline(source, s).png({ compressionLevel: 9 }).toBuffer()),
   );
   const ico = await pngToIco(buffers);
   const out = resolve(iconsDir, outName);
   writeFileSync(out, ico);
+  console.log('wrote', out);
+}
+
+// Tray export keeps the source's natural transparent margin (no trim) so
+// the artwork sits comfortably inside the inscribed circle. When a circle
+// color is given, the artwork is composited over a filled SVG circle that
+// fills the canvas.
+async function exportTrayPng(source, size, outName, circleColor) {
+  const artwork = await sharp(source)
+    .resize(size, size, RESIZE_OPTS)
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+
+  const out = resolve(iconsDir, outName);
+  if (circleColor) {
+    const r = size / 2;
+    const circle = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${r}" cy="${r}" r="${r}" fill="${circleColor}"/></svg>`,
+    );
+    await sharp(circle)
+      .composite([{ input: artwork }])
+      .png({ compressionLevel: 9 })
+      .toFile(out);
+  } else {
+    writeFileSync(out, artwork);
+  }
   console.log('wrote', out);
 }
 
@@ -61,9 +100,9 @@ async function main() {
   // Windows multi-size ICO.
   await exportIco(sourceActive, [16, 24, 32, 48, 64, 128, 256], 'icon.ico');
 
-  // Tray two-state icons.
-  await exportPng(sourceActive, 32, 'tray-active.png');
-  await exportPng(sourceIdle, 32, 'tray-idle.png');
+  // Tray two-state icons: active has a purple circle, idle stays transparent.
+  await exportTrayPng(sourceActive, 32, 'tray-active.png', TRAY_ACTIVE_CIRCLE);
+  await exportTrayPng(sourceIdle, 32, 'tray-idle.png', null);
 }
 
 await main();
