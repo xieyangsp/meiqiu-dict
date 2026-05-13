@@ -4,17 +4,25 @@
 use std::sync::Arc;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, Position, Runtime, State, async_runtime};
+use tauri::{
+    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Runtime, State,
+    async_runtime,
+};
 
 use crate::dict::{self, DictEntry};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
+use crate::window::clamp_to_monitor;
 
 const FLOATER_LABEL: &str = "floater";
 const POPUP_LABEL: &str = "popup";
 
 /// Vertical offset of the popup below the captured cursor.
 const POPUP_DROP: i32 = 30;
+
+/// Declared popup size in tauri.conf.json; kept in sync manually.
+const POPUP_W: u32 = 360;
+const POPUP_H: u32 = 260;
 
 #[derive(Clone, Serialize)]
 struct LookupPayload<'a> {
@@ -50,10 +58,18 @@ pub fn request_lookup<R: Runtime>(
         .get_webview_window(POPUP_LABEL)
         .ok_or_else(|| AppError::Other("popup window not found".into()))?;
     if let Some((x, y)) = state.last_cursor() {
-        let target = PhysicalPosition::new(x, y + POPUP_DROP);
+        let anchor = PhysicalPosition::new(x, y + POPUP_DROP);
+        // outer_size() returns physical pixels and accounts for DPI scaling;
+        // fall back to the declared logical size if the query fails.
+        let size = popup
+            .outer_size()
+            .unwrap_or(PhysicalSize::new(POPUP_W, POPUP_H));
+        let target = clamp_to_monitor(&app, anchor, size);
         popup.set_position(Position::Physical(target))?;
     }
     popup.show()?;
+    // Re-assert topmost so we sit above the Windows taskbar.
+    popup.set_always_on_top(true)?;
     popup.set_focus()?;
     app.emit_to(POPUP_LABEL, "lookup-request", LookupPayload { text: &text })?;
     Ok(())

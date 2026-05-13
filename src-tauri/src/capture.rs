@@ -14,11 +14,12 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 use rdev::{Button, Event, EventType, listen};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, Runtime};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Runtime};
 
 use crate::error::{AppError, AppResult};
 use crate::selection::is_acceptable_selection;
 use crate::state::AppState;
+use crate::window::clamp_to_monitor;
 
 /// Minimum gap between two capture candidates. Guards against double-click
 /// noise and rapid drag-release sequences.
@@ -33,6 +34,10 @@ const COPY_SETTLE: Duration = Duration::from_millis(80);
 const FLOATER_OFFSET: i32 = 12;
 
 const FLOATER_LABEL: &str = "floater";
+
+/// Declared floater size in tauri.conf.json; kept in sync manually.
+const FLOATER_W: u32 = 88;
+const FLOATER_H: u32 = 36;
 
 #[derive(Clone, Serialize)]
 struct SelectionPayload<'a> {
@@ -146,12 +151,23 @@ fn show_floater<R: Runtime>(app: &AppHandle<R>, text: &str, (x, y): (i32, i32)) 
         log::warn!("floater window not found");
         return;
     };
-    let target = PhysicalPosition::new(x + FLOATER_OFFSET, y + FLOATER_OFFSET);
+    let anchor = PhysicalPosition::new(x + FLOATER_OFFSET, y + FLOATER_OFFSET);
+    // outer_size() returns physical pixels and accounts for DPI scaling;
+    // fall back to the declared logical size if the query fails.
+    let size = win
+        .outer_size()
+        .unwrap_or(PhysicalSize::new(FLOATER_W, FLOATER_H));
+    let target = clamp_to_monitor(app, anchor, size);
     if let Err(e) = win.set_position(tauri::Position::Physical(target)) {
         log::warn!("floater set_position: {e}");
     }
     if let Err(e) = win.show() {
         log::warn!("floater show: {e}");
+    }
+    // Re-assert topmost so we sit above the Windows taskbar; the config
+    // value alone is not enough when the window never takes focus.
+    if let Err(e) = win.set_always_on_top(true) {
+        log::warn!("floater set_always_on_top: {e}");
     }
     if let Err(e) = app.emit_to(FLOATER_LABEL, "selection-acquired", SelectionPayload { text }) {
         log::warn!("floater emit: {e}");
