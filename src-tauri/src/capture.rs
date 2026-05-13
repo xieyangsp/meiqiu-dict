@@ -45,9 +45,10 @@ pub fn start_listener<R: Runtime>(app: AppHandle<R>, state: Arc<AppState>) -> Ap
     let (tx, rx) = mpsc::channel::<(i32, i32)>();
 
     let app_worker = app.clone();
+    let state_worker = state.clone();
     thread::Builder::new()
         .name("capture-worker".into())
-        .spawn(move || worker_loop(rx, app_worker))
+        .spawn(move || worker_loop(rx, app_worker, state_worker))
         .map_err(|e| AppError::Capture(format!("spawn worker: {e}")))?;
 
     let last_emit: Arc<Mutex<Option<Instant>>> = Arc::new(Mutex::new(None));
@@ -98,7 +99,11 @@ fn handle(
     }
 }
 
-fn worker_loop<R: Runtime>(rx: mpsc::Receiver<(i32, i32)>, app: AppHandle<R>) {
+fn worker_loop<R: Runtime>(
+    rx: mpsc::Receiver<(i32, i32)>,
+    app: AppHandle<R>,
+    state: Arc<AppState>,
+) {
     while let Ok(mut pos) = rx.recv() {
         // Drain extra pending signals so we only do one cycle per burst.
         // Keep the most recent cursor position.
@@ -111,6 +116,7 @@ fn worker_loop<R: Runtime>(rx: mpsc::Receiver<(i32, i32)>, app: AppHandle<R>) {
                 let trimmed = text.trim();
                 if is_acceptable_selection(trimmed) {
                     log::info!("capture acquired: {trimmed:?}");
+                    state.set_last_cursor(pos);
                     show_floater(&app, trimmed, pos);
                 }
             }

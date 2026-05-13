@@ -6,7 +6,7 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 
-import { hideCurrentWindow, onSelectionAcquired } from '../shared/ipc';
+import { hideCurrentWindow, onSelectionAcquired, requestLookup } from '../shared/ipc';
 
 const AUTO_HIDE_MS = 3000;
 
@@ -24,12 +24,15 @@ function scheduleHide() {
 }
 
 function onClick() {
-  // Phase 3d will dispatch a lookup request here. For now just dismiss.
   if (hideTimer !== null) {
     window.clearTimeout(hideTimer);
     hideTimer = null;
   }
-  void hideCurrentWindow();
+  if (text.value) {
+    void requestLookup(text.value);
+  } else {
+    void hideCurrentWindow();
+  }
 }
 
 onMounted(async () => {
