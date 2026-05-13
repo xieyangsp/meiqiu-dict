@@ -58,9 +58,13 @@ onUnmounted(() => {
     class="flex h-full w-full flex-col overflow-hidden rounded-lg bg-white text-sm text-neutral-900 shadow-xl ring-1 ring-black/10"
   >
     <header class="flex items-center justify-between border-b border-neutral-200 px-3 py-2">
-      <span class="truncate font-medium text-neutral-700">{{ query || '词典' }}</span>
+      <span
+        data-tauri-drag-region
+        class="flex-1 select-none truncate font-medium text-neutral-700"
+        >{{ query || '词典' }}</span
+      >
       <button
-        class="rounded px-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
+        class="ml-2 rounded px-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
         title="关闭"
         @click="hideCurrentWindow"
       >
