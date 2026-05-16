@@ -8,11 +8,39 @@ use tauri::{AppHandle, Manager};
 
 use crate::error::{AppError, AppResult};
 
+/// Available selection-capture methods, evaluated in the order listed by
+/// `AppConfig::capture_methods`.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CaptureMethod {
+    /// Read selection from the focused UI Automation element. Side-effect free.
+    Uia,
+    /// Simulate Ctrl+C and read the system clipboard, restoring the prior value.
+    Clipboard,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub hotkey: String,
     pub autostart: bool,
     pub tts_voice: Option<String>,
+    /// Master switch for the UIA capture method.
+    #[serde(default = "default_true")]
+    pub uia_enabled: bool,
+    /// Master switch for the clipboard (Ctrl+C) capture method.
+    #[serde(default = "default_true")]
+    pub clipboard_enabled: bool,
+    /// Ordered preference list. Each method runs only if its master switch is on.
+    #[serde(default = "default_capture_methods")]
+    pub capture_methods: Vec<CaptureMethod>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_capture_methods() -> Vec<CaptureMethod> {
+    vec![CaptureMethod::Uia, CaptureMethod::Clipboard]
 }
 
 impl Default for AppConfig {
@@ -21,6 +49,9 @@ impl Default for AppConfig {
             hotkey: "CommandOrControl+Alt+T".into(),
             autostart: false,
             tts_voice: None,
+            uia_enabled: default_true(),
+            clipboard_enabled: default_true(),
+            capture_methods: default_capture_methods(),
         }
     }
 }
