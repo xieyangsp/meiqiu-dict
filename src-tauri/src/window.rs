@@ -1,4 +1,27 @@
-use tauri::{AppHandle, Monitor, PhysicalPosition, PhysicalSize, Runtime};
+use tauri::{AppHandle, Monitor, PhysicalPosition, PhysicalSize, Position, Runtime, WebviewWindow};
+
+use crate::error::AppResult;
+
+pub const MAIN_LABEL: &str = "main";
+pub const FLOATER_LABEL: &str = "floater";
+pub const POPUP_LABEL: &str = "popup";
+
+pub const OWN_WINDOW_LABELS: &[&str] = &[MAIN_LABEL, FLOATER_LABEL, POPUP_LABEL];
+
+pub fn position_at<R: Runtime>(
+    app: &AppHandle<R>,
+    win: &WebviewWindow<R>,
+    anchor: PhysicalPosition<i32>,
+) -> AppResult<()> {
+    match win.outer_size() {
+        Ok(size) => {
+            let target = clamp_to_monitor(app, anchor, size);
+            win.set_position(Position::Physical(target))?;
+        }
+        Err(e) => log::warn!("{} outer_size: {e}; skipping reposition", win.label()),
+    }
+    Ok(())
+}
 
 pub fn clamp_to_monitor<R: Runtime>(
     app: &AppHandle<R>,

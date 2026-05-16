@@ -2,17 +2,14 @@ use std::sync::Arc;
 
 use serde::Serialize;
 use tauri::{
-    AppHandle, Emitter, Manager, PhysicalPosition, Position, Runtime, State,
+    AppHandle, Emitter, Manager, PhysicalPosition, Runtime, State,
     async_runtime,
 };
 
 use crate::dict::{self, DictEntry};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
-use crate::window::clamp_to_monitor;
-
-const FLOATER_LABEL: &str = "floater";
-const POPUP_LABEL: &str = "popup";
+use crate::window::{self, FLOATER_LABEL, POPUP_LABEL};
 
 const POPUP_DROP: i32 = 30;
 
@@ -45,20 +42,16 @@ pub fn request_lookup<R: Runtime>(
     // Transition first so any mouseup arriving mid-flight is suppressed.
     state.enter_popup();
     if let Some(floater) = app.get_webview_window(FLOATER_LABEL) {
-        let _ = floater.hide();
+        if let Err(e) = floater.hide() {
+            log::warn!("floater hide: {e}");
+        }
     }
     let popup = app
         .get_webview_window(POPUP_LABEL)
         .ok_or_else(|| AppError::Other("popup window not found".into()))?;
     if let Some((x, y)) = state.last_cursor() {
         let anchor = PhysicalPosition::new(x, y + POPUP_DROP);
-        match popup.outer_size() {
-            Ok(size) => {
-                let target = clamp_to_monitor(&app, anchor, size);
-                popup.set_position(Position::Physical(target))?;
-            }
-            Err(e) => log::warn!("popup outer_size: {e}; skipping reposition"),
-        }
+        window::position_at(&app, &popup, anchor)?;
     }
     popup.show()?;
 

@@ -3,9 +3,10 @@ use std::sync::Arc;
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuEvent, MenuItem};
 use tauri::tray::{TrayIcon, TrayIconBuilder};
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Emitter, Listener, Manager, Runtime};
 
 use crate::error::{AppError, AppResult};
+use crate::events;
 use crate::state::AppState;
 
 pub const TRAY_ID: &str = "main-tray";
@@ -40,10 +41,22 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> AppResult<TrayIcon<R>> {
         .build(app)
         .map_err(|e| AppError::Tray(e.to_string()))?;
     app.manage(ToggleMenuItem(toggle));
+
+    let listen_handle = app.clone();
+    app.listen(events::CAPTURE_TOGGLED, move |event| {
+        match serde_json::from_str::<bool>(event.payload()) {
+            Ok(enabled) => {
+                if let Err(e) = sync(&listen_handle, enabled) {
+                    log::warn!("tray sync via event failed: {e}");
+                }
+            }
+            Err(e) => log::warn!("tray event payload parse failed: {e}"),
+        }
+    });
     Ok(tray)
 }
 
-pub fn sync<R: Runtime>(app: &AppHandle<R>, enabled: bool) -> AppResult<()> {
+fn sync<R: Runtime>(app: &AppHandle<R>, enabled: bool) -> AppResult<()> {
     let Some(tray) = app.tray_by_id(TRAY_ID) else {
         return Err(AppError::Tray("tray not found".into()));
     };
@@ -70,8 +83,8 @@ fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
             if let Some(state) = app.try_state::<Arc<AppState>>() {
                 let enabled = state.toggle_capture();
                 log::info!("tray toggled capture: enabled={enabled}");
-                if let Err(e) = sync(app, enabled) {
-                    log::warn!("tray sync failed: {e}");
+                if let Err(e) = app.emit(events::CAPTURE_TOGGLED, enabled) {
+                    log::warn!("tray emit {}: {e}", events::CAPTURE_TOGGLED);
                 }
             }
         }

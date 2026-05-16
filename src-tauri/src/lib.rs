@@ -3,6 +3,7 @@ mod commands;
 mod config;
 mod dict;
 mod error;
+mod events;
 mod hotkey;
 mod selection;
 mod state;
@@ -16,7 +17,17 @@ use tauri::Manager;
 use tauri::path::BaseDirectory;
 use tauri_plugin_log::{Target, TargetKind};
 
-use crate::state::AppState;
+use crate::error::AppResult;
+use crate::state::{AppState, DictPool};
+
+fn try_open_dict<R: tauri::Runtime>(handle: &tauri::AppHandle<R>) -> AppResult<DictPool> {
+    let db_path = handle
+        .path()
+        .resolve("resources/ecdict.db", BaseDirectory::Resource)?;
+    let pool = dict::open(&db_path)?;
+    log::info!("dict pool open: {}", db_path.display());
+    Ok(pool)
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -48,18 +59,9 @@ pub fn run() {
             let state = AppState::new(cfg);
             app.manage::<Arc<AppState>>(state.clone());
 
-            match handle
-                .path()
-                .resolve("resources/ecdict.db", BaseDirectory::Resource)
-            {
-                Ok(db_path) => match dict::open(&db_path) {
-                    Ok(pool) => {
-                        state.set_dict(pool);
-                        log::info!("dict pool open: {}", db_path.display());
-                    }
-                    Err(e) => log::warn!("dict pool open failed: {e}"),
-                },
-                Err(e) => log::warn!("resolve ecdict.db path failed: {e}"),
+            match try_open_dict(handle) {
+                Ok(pool) => state.set_dict(pool),
+                Err(e) => log::warn!("dict pool init failed: {e}"),
             }
 
             tray::build(handle)?;

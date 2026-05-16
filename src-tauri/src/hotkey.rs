@@ -1,12 +1,12 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 use crate::error::{AppError, AppResult};
+use crate::events;
 use crate::state::AppState;
-use crate::tray;
 
 pub fn register<R: Runtime>(app: &AppHandle<R>, accelerator: &str) -> AppResult<()> {
     let shortcut = Shortcut::from_str(accelerator)
@@ -30,7 +30,7 @@ fn on_triggered<R: Runtime>(app: &AppHandle<R>, _shortcut: &Shortcut, event: tau
     };
     let enabled = state.toggle_capture();
     log::info!("hotkey toggled capture: enabled={enabled}");
-    if let Err(e) = tray::sync(app, enabled) {
-        log::warn!("failed to sync tray after hotkey: {e}");
+    if let Err(e) = app.emit(events::CAPTURE_TOGGLED, enabled) {
+        log::warn!("hotkey emit {}: {e}", events::CAPTURE_TOGGLED);
     }
 }
