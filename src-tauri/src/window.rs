@@ -1,12 +1,5 @@
-// Small window-positioning helpers shared by capture (floater) and
-// commands (popup). The pure `clamp_rect` does the math so it stays
-// trivially unit-testable; `clamp_to_monitor` is the thin Tauri adapter.
-
 use tauri::{AppHandle, Monitor, PhysicalPosition, PhysicalSize, Runtime};
 
-/// Clamp a `size`-sized window anchored at `anchor` so it fits inside
-/// the monitor whose rect contains the anchor. Falls back to the
-/// primary monitor, then to the anchor unchanged.
 pub fn clamp_to_monitor<R: Runtime>(
     app: &AppHandle<R>,
     anchor: PhysicalPosition<i32>,
@@ -51,7 +44,7 @@ fn clamp_rect(
     let h = size.height as i32;
     let min_x = mon_pos.x;
     let min_y = mon_pos.y;
-    // If the window is wider than the monitor, prefer the left edge.
+    // Windows wider than the monitor prefer the left edge.
     let max_x = (mon_pos.x + mon_size.width as i32 - w).max(min_x);
     let max_y = (mon_pos.y + mon_size.height as i32 - h).max(min_y);
     PhysicalPosition::new(anchor.x.clamp(min_x, max_x), anchor.y.clamp(min_y, max_y))

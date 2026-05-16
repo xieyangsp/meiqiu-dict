@@ -1,6 +1,3 @@
-// Library entry: assembles plugins, state, tray, and the hotkey.
-// Tauri 2 idiom: startup lives in lib; main only calls run().
-
 mod capture;
 mod commands;
 mod config;
@@ -51,7 +48,6 @@ pub fn run() {
             let state = AppState::new(cfg);
             app.manage::<Arc<AppState>>(state.clone());
 
-            // Bundled dictionary lives at <resource>/resources/ecdict.db.
             match handle
                 .path()
                 .resolve("resources/ecdict.db", BaseDirectory::Resource)

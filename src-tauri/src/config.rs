@@ -1,5 +1,3 @@
-// User configuration. Single owner of %APPDATA%/com.meiqiu.dict/config.json.
-
 use std::fs;
 use std::path::PathBuf;
 
@@ -8,14 +6,11 @@ use tauri::{AppHandle, Manager};
 
 use crate::error::{AppError, AppResult};
 
-/// Available selection-capture methods, evaluated in the order listed by
-/// `AppConfig::capture_methods`.
+// Evaluated in the order listed by `AppConfig::capture_methods`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum CaptureMethod {
-    /// Read selection from the focused UI Automation element. Side-effect free.
     Uia,
-    /// Simulate Ctrl+C and read the system clipboard, restoring the prior value.
     Clipboard,
 }
 
@@ -24,13 +19,11 @@ pub struct AppConfig {
     pub hotkey: String,
     pub autostart: bool,
     pub tts_voice: Option<String>,
-    /// Master switch for the UIA capture method.
     #[serde(default = "default_true")]
     pub uia_enabled: bool,
-    /// Master switch for the clipboard (Ctrl+C) capture method.
     #[serde(default = "default_true")]
     pub clipboard_enabled: bool,
-    /// Ordered preference list. Each method runs only if its master switch is on.
+    // Methods run in this order, each gated by its `*_enabled` flag.
     #[serde(default = "default_capture_methods")]
     pub capture_methods: Vec<CaptureMethod>,
 }
