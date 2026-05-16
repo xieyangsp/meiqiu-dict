@@ -40,11 +40,12 @@ meiqiu-dict/
 ## Architecture
 
 - Module tiers (only `lib.rs` wires them together):
-  - **Infrastructure** (`state`, `error`, `config`): anyone may import.
-  - **Utility** (`selection`, `window`): pure helpers; anyone may import. New utility modules must stay pure (no `AppState`, no `AppHandle`, except as parameters).
-  - **Business** (`dict`, `capture`, `hotkey`, `tray`, `tts`): **do not import each other**. They communicate through `AppState` and Tauri events.
-  - **IPC boundary** (`commands`): the only Rust code the frontend reaches via `invoke`. It is allowed to call into business modules; nothing imports `commands`.
+  - **Infrastructure** (`state`, `error`, `config`, `events`): anyone may import. **Must not** import Business or Utility modules.
+  - **Utility** (`selection`, `window`): pure helpers; anyone may import. New utility modules must stay pure (no `AppState`, no `AppHandle`, except as parameters). **Must not** import Business or `state`.
+  - **Business** (`dict`, `capture`, `hotkey`, `tray`, `tts`): **do not import each other**. They communicate through `AppState` and Tauri events (event names live in `events.rs`).
+  - **IPC boundary** (`commands`): the only Rust code the frontend reaches via `invoke`. It is allowed to call into business modules; **nothing imports `commands`**.
   - **Assembly** (`lib`, `main`): the only place that registers plugins, builds `AppState`, installs the tray, registers the hotkey, and exposes commands. `main.rs` only calls `lib::run()`.
+- Tier rules are mechanically enforced by `src-tauri/tests/architecture.rs`. Run `cargo test --test architecture` to check; the suite parses each module file and asserts the import directions above. Adding a new module means listing it in that test's `BUSINESS` / `INFRASTRUCTURE` / `UTILITY` arrays.
 - Pattern: pure function + thin Tauri adapter. Examples: `dict::lookup_conn` (pure) / `dict::lookup` (pool adapter); `window::clamp_rect` (pure) / `window::clamp_to_monitor` (Tauri adapter). Unit-test the pure half; the adapter stays thin.
 - Errors: business code returns `AppError` (`src-tauri/src/error.rs`). `commands.rs` propagates `AppResult<T>` to the frontend with `?` (`AppError` already implements `Serialize`).
 - Config: `config.rs` is the only place that reads and writes `%APPDATA%\com.meiqiu.dict\config.json`. Other modules take snapshots via `AppState::config()`.

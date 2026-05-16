@@ -13,7 +13,7 @@ use crate::error::{AppError, AppResult};
 use crate::selection::{SelectionOutcome, is_acceptable_selection};
 use crate::state::{AppState, CaptureState};
 use crate::uia;
-use crate::window::clamp_to_monitor;
+use crate::window::{self, FLOATER_LABEL, OWN_WINDOW_LABELS};
 
 const THROTTLE: Duration = Duration::from_millis(200);
 
@@ -21,10 +21,6 @@ const THROTTLE: Duration = Duration::from_millis(200);
 const COPY_SETTLE: Duration = Duration::from_millis(80);
 
 const FLOATER_OFFSET: i32 = 12;
-const FLOATER_LABEL: &str = "floater";
-
-// Clicks inside our own webviews must not start a capture cycle.
-const OWN_WINDOW_LABELS: &[&str] = &["floater", "popup", "main"];
 
 #[derive(Clone, Serialize)]
 struct SelectionPayload<'a> {
@@ -175,14 +171,8 @@ fn show_floater<R: Runtime>(app: &AppHandle<R>, text: &str, (x, y): (i32, i32)) 
         return;
     };
     let anchor = PhysicalPosition::new(x + FLOATER_OFFSET, y + FLOATER_OFFSET);
-    match win.outer_size() {
-        Ok(size) => {
-            let target = clamp_to_monitor(app, anchor, size);
-            if let Err(e) = win.set_position(tauri::Position::Physical(target)) {
-                log::warn!("floater set_position: {e}");
-            }
-        }
-        Err(e) => log::warn!("floater outer_size: {e}; skipping reposition"),
+    if let Err(e) = window::position_at(app, &win, anchor) {
+        log::warn!("floater position_at: {e}");
     }
     if let Err(e) = win.show() {
         log::warn!("floater show: {e}");

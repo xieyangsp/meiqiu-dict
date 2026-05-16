@@ -1,8 +1,11 @@
 use parking_lot::RwLock;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 use std::sync::Arc;
 
 use crate::config::AppConfig;
-use crate::dict::DictPool;
+
+pub type DictPool = Pool<SqliteConnectionManager>;
 
 /// Capture only fires in Idle or Floater. Disabled gates the pipeline off;
 /// Popup means the user owns the popup so no new captures start until it hides.

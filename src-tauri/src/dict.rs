@@ -1,12 +1,10 @@
-use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use serde::Serialize;
 use std::path::Path;
 
 use crate::error::{AppError, AppResult};
-
-pub type DictPool = Pool<SqliteConnectionManager>;
+use crate::state::DictPool;
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct DictEntry {
@@ -19,7 +17,7 @@ pub struct DictEntry {
 pub fn open(db_path: &Path) -> AppResult<DictPool> {
     let manager = SqliteConnectionManager::file(db_path)
         .with_flags(OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX);
-    Pool::builder()
+    r2d2::Pool::builder()
         .max_size(4)
         .build(manager)
         .map_err(|e| AppError::Dict(format!("open pool: {e}")))
