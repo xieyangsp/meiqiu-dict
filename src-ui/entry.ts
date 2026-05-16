@@ -2,7 +2,6 @@ import { createApp, type Component } from 'vue';
 import { createPinia } from 'pinia';
 import './assets/styles.css';
 
-// Pick which App to mount based on the ?win= query parameter.
 const winName = new URLSearchParams(window.location.search).get('win') ?? 'main';
 
 const loaders: Record<string, () => Promise<{ default: Component }>> = {

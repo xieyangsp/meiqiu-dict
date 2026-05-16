@@ -1,8 +1,4 @@
 <script setup lang="ts">
-// Small bubble shown near the cursor after a selection. Backend positions
-// and shows the window; this component fills in the text and hides itself
-// on click or after a timeout. Lookup wiring lands with the popup window.
-
 import { onMounted, onUnmounted, ref } from 'vue';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 

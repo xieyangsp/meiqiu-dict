@@ -1,11 +1,3 @@
-// Dictionary lookup backed by a bundled, read-only SQLite db.
-//
-// The schema mirrors scripts/build-dict.mjs:
-//   entries(word PK, phonetic, translation, lang_src, lang_tgt)
-//
-// A single r2d2 pool is shared via AppState. lookup_conn is the pure
-// function; lookup is the thin adapter that pulls a connection.
-
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
@@ -24,7 +16,6 @@ pub struct DictEntry {
     pub lang_pair: String,
 }
 
-/// Open a read-only pool over the bundled db.
 pub fn open(db_path: &Path) -> AppResult<DictPool> {
     let manager = SqliteConnectionManager::file(db_path)
         .with_flags(OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX);
@@ -34,7 +25,6 @@ pub fn open(db_path: &Path) -> AppResult<DictPool> {
         .map_err(|e| AppError::Dict(format!("open pool: {e}")))
 }
 
-/// Look up a word via the pool. Returns Ok(None) if not found.
 pub fn lookup(pool: &DictPool, word: &str) -> AppResult<Option<DictEntry>> {
     let conn = pool
         .get()
@@ -42,7 +32,6 @@ pub fn lookup(pool: &DictPool, word: &str) -> AppResult<Option<DictEntry>> {
     lookup_conn(&conn, word)
 }
 
-/// Pure lookup against a connection; words are matched lowercased.
 pub fn lookup_conn(conn: &Connection, word: &str) -> AppResult<Option<DictEntry>> {
     let key = word.trim().to_lowercase();
     if key.is_empty() {
@@ -73,8 +62,7 @@ pub fn lookup_conn(conn: &Connection, word: &str) -> AppResult<Option<DictEntry>
     }))
 }
 
-/// ECDICT stores newlines as the literal two-character sequence `\n`.
-/// Convert them to real newlines so the UI can render multi-line entries.
+// ECDICT stores newlines as the literal two characters `\n`.
 fn unescape_translation(raw: &str) -> String {
     raw.replace("\\n", "\n")
 }

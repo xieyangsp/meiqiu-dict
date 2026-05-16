@@ -1,5 +1,3 @@
-// Centralized IPC layer. Components must not call @tauri-apps/api directly.
-
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
@@ -30,13 +28,11 @@ export function hideCurrentWindow(): Promise<void> {
   return getCurrentWebviewWindow().hide();
 }
 
-/// Hide the floater and notify the backend so the state machine returns to Idle.
 export async function hideFloater(): Promise<void> {
   await getCurrentWebviewWindow().hide();
   await invoke('notify_floater_hidden');
 }
 
-/// Hide the popup and notify the backend so the state machine returns to Idle.
 export async function hidePopup(): Promise<void> {
   await getCurrentWebviewWindow().hide();
   await invoke('notify_popup_hidden');

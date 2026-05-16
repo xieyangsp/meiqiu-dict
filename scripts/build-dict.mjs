@@ -1,14 +1,3 @@
-// Build src-tauri/resources/ecdict.db from the ECDICT csv.
-//
-// Source : scripts/data/ecdict.csv (gitignored; ~63MB, ~770k rows)
-// Output : src-tauri/resources/ecdict.db (gitignored; bundled at build time)
-//
-// Schema is intentionally tiny. lang_src/lang_tgt are cheap seams reserved
-// for future non-en-zh dictionaries (per AGENTS.md), but ECDICT is uniformly
-// en-zh.
-//
-// Uses node:sqlite (built into Node >= 22) so the script has no native build step.
-
 import { createReadStream, mkdirSync, statSync, existsSync, rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,8 +53,7 @@ const t0 = Date.now();
 let total = 0;
 let inserted = 0;
 
-// Batch into transactions of 5k rows for throughput. node:sqlite has no
-// transaction() helper, so drive BEGIN/COMMIT manually.
+// node:sqlite has no transaction() helper, so drive BEGIN/COMMIT in 5k-row batches.
 const BATCH = 5000;
 let batch = [];
 function flush() {

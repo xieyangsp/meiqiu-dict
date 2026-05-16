@@ -1,5 +1,3 @@
-// Global hotkey: toggle capture_enabled and sync the tray on each press.
-
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -24,7 +22,6 @@ pub fn register<R: Runtime>(app: &AppHandle<R>, accelerator: &str) -> AppResult<
 }
 
 fn on_triggered<R: Runtime>(app: &AppHandle<R>, _shortcut: &Shortcut, event: tauri_plugin_global_shortcut::ShortcutEvent) {
-    // Only react on key-down; ignore key-up.
     if event.state() != ShortcutState::Pressed {
         return;
     }

@@ -1,8 +1,4 @@
 <script setup lang="ts">
-// Dictionary definition popup. Listens for lookup-request events emitted
-// by the backend after the user clicks the floater, queries the bundled
-// dictionary, and renders the entry.
-
 import { onMounted, onUnmounted, ref } from 'vue';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 

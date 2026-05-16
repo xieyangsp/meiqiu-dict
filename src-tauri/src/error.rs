@@ -1,5 +1,3 @@
-// Global error type. Business modules return AppError; main / commands handle it.
-
 use thiserror::Error;
 
 #[derive(Debug, Error)]

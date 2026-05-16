@@ -1,6 +1,3 @@
-// System tray with two-state icon (active/idle) and a menu (toggle / quit).
-// Owns no business state; talks to AppState via Tauri's managed state.
-
 use std::sync::Arc;
 
 use tauri::image::Image;
@@ -24,7 +21,7 @@ const LABEL_DISABLE: &str = "关闭划词监听";
 const TIP_ON: &str = "煤球词典 — 划词监听：开";
 const TIP_OFF: &str = "煤球词典 — 划词监听：关";
 
-/// Managed handle to the toggle menu item so `sync()` can update its label.
+// Managed handle to the toggle menu item so `sync` can relabel it.
 struct ToggleMenuItem<R: Runtime>(MenuItem<R>);
 
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> AppResult<TrayIcon<R>> {
@@ -46,7 +43,6 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> AppResult<TrayIcon<R>> {
     Ok(tray)
 }
 
-/// Sync the tray icon, tooltip, and toggle-item label with the latest state.
 pub fn sync<R: Runtime>(app: &AppHandle<R>, enabled: bool) -> AppResult<()> {
     let Some(tray) = app.tray_by_id(TRAY_ID) else {
         return Err(AppError::Tray("tray not found".into()));
