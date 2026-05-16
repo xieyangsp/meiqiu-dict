@@ -78,9 +78,24 @@ meiqiu-dict/
 - Vue: `<script setup lang="ts">` only. No Options API.
 - Styling: Tailwind utilities by default. For richer components, copy shadcn-vue primitives into `src-ui/shared/ui/` on demand. Never install the full shadcn-vue package.
 - Naming: English identifiers everywhere. Product is **MeiQiuDict / 煤球词典**. Bundle id `com.meiqiu.dict`, crate `meiqiu-dict`, lib `meiqiu_dict_lib`.
-- Comments: one to three lines describing WHAT. No design history, no "previously this was X" notes, no milestone or phase tags.
 - Never put milestone identifiers (`PR-1`, `M1`, `Step 3`, `Phase 1`, etc.) in code, comments, tests, or commit messages.
 - Language rule: code, comments, and developer-facing log/error strings are English. Only end-user-visible UI strings (window titles, tray menu labels, tooltips, button text) stay in Chinese.
+
+### Comments
+
+Default to self-documenting code. A comment is a code smell: before writing one, try a better name, a smaller function, a named constant, or a type. The rules below apply to every language in the repo (Rust, TS, Vue, mjs scripts, JSON-with-comments where allowed).
+
+- **Hard cap: 3 lines per comment block**, including `///` / `/** */` doc comments and Vue `<!-- -->`. If you need more, the code or the names are wrong, not the comment budget.
+- **Explain WHY, not WHAT.** The code already says what. A comment earns its place only when a reader cannot infer *why* from names and types: a non-obvious tradeoff, an OS quirk, a spec citation, a workaround for a known bug.
+- **No doc comments that paraphrase the signature.** `/// Look up a word.` on `fn lookup(word: &str) -> Option<DictEntry>` is noise. Delete it.
+- **No file/module banner comments.** Module roles are documented in `AGENTS.md`. Do not put a prose block above `mod foo;` or at the top of `foo.rs`, `foo.ts`, or `foo.vue`. Doc comments belong on the public item.
+- **No cross-references from code to AGENTS.md, AI memory, PRs, issues, or milestones.** Source must read standalone. Cite external facts with a terse link only: `// Win32 SendInput: <msdn-url>`.
+- **No commented-out code.** Delete it; git remembers.
+- **`TODO` / `FIXME` require an owner and a tracker link**, e.g. `// TODO(xieyang): #42 multi-monitor DPI`. Bare `TODO:` is forbidden.
+- **No design history, no "previously this was X", no phase or milestone tags.**
+- **No emoji, no ASCII art, no boxed dividers** (`// ==========`).
+- **Formatting.** One blank line above a comment block, none below; comment sits immediately on top of the code it describes. Inline `// ...` trailing comments are allowed but counted against the 3-line cap when stacked.
+- **Tests are documentation.** Prefer a named test case (`fn rejects_empty_selection()`) over a paragraph explaining tricky logic.
 
 ## Tests
 
