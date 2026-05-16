@@ -29,3 +29,15 @@ export function dictLookup(word: string): Promise<DictEntry | null> {
 export function hideCurrentWindow(): Promise<void> {
   return getCurrentWebviewWindow().hide();
 }
+
+/// Hide the floater and notify the backend so the state machine returns to Idle.
+export async function hideFloater(): Promise<void> {
+  await getCurrentWebviewWindow().hide();
+  await invoke('notify_floater_hidden');
+}
+
+/// Hide the popup and notify the backend so the state machine returns to Idle.
+export async function hidePopup(): Promise<void> {
+  await getCurrentWebviewWindow().hide();
+  await invoke('notify_popup_hidden');
+}

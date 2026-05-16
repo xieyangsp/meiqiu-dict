@@ -1,5 +1,21 @@
 // Selection acceptance filter. First of three multilingual seams
 // listed in AGENTS.md. Today it accepts English-ish words only.
+//
+// Also defines the shared outcome enum returned by every capture method
+// (UIA, clipboard, ...). Capture orchestrator dispatches on this.
+
+/// Result of one capture method attempting to read the current selection.
+#[derive(Debug, Clone)]
+pub enum SelectionOutcome {
+    /// Method captured a non-empty selection.
+    Text(String),
+    /// Method ran successfully and confirmed nothing is selected. The
+    /// orchestrator should stop and not try the next method.
+    NoSelection,
+    /// Method does not apply to the focused target (or hit a hard error).
+    /// The orchestrator should try the next method.
+    Unsupported,
+}
 
 /// Returns true if the captured selection looks like a dictionary-lookup
 /// candidate. Pure, side-effect free.

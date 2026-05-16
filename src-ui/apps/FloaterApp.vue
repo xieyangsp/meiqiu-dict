@@ -6,7 +6,7 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 
-import { hideCurrentWindow, onSelectionAcquired, requestLookup } from '../shared/ipc';
+import { hideFloater, onSelectionAcquired, requestLookup } from '../shared/ipc';
 
 const AUTO_HIDE_MS = 3000;
 
@@ -19,7 +19,7 @@ function scheduleHide() {
     window.clearTimeout(hideTimer);
   }
   hideTimer = window.setTimeout(() => {
-    void hideCurrentWindow();
+    void hideFloater();
   }, AUTO_HIDE_MS);
 }
 
@@ -31,7 +31,7 @@ function onClick() {
   if (text.value) {
     void requestLookup(text.value);
   } else {
-    void hideCurrentWindow();
+    void hideFloater();
   }
 }
 

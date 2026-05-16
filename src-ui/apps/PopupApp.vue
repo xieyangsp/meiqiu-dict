@@ -6,7 +6,7 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 
-import { dictLookup, hideCurrentWindow, onLookupRequest } from '../shared/ipc';
+import { dictLookup, hidePopup, onLookupRequest } from '../shared/ipc';
 import type { DictEntry } from '../shared/types';
 
 const query = ref('');
@@ -34,7 +34,7 @@ async function lookup(text: string) {
 
 function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
-    void hideCurrentWindow();
+    void hidePopup();
   }
 }
 
@@ -66,7 +66,7 @@ onUnmounted(() => {
       <button
         class="ml-2 rounded px-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
         title="关闭"
-        @click="hideCurrentWindow"
+        @click="hidePopup"
       >
         ×
       </button>
