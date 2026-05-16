@@ -33,7 +33,13 @@ r2d2 = "0.8"
 r2d2_sqlite = "0.25"
 rdev = "0.5"
 arboard = "3.4"
-enigo = "0.3"
+windows = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_System_Variant",
+    "Win32_UI_Accessibility",
+    "Win32_UI_Input_KeyboardAndMouse",
+] }
 
 [profile.release]
 panic = "abort"

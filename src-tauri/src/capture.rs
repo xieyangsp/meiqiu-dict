@@ -1,10 +1,12 @@
-// Mouse listener + clipboard cycle. When capture is enabled and the user
-// releases the left mouse button, simulate Ctrl+C, read the selection,
-// position the floater near the cursor, show it, and emit the text payload.
+// Mouse listener + per-method capture orchestration. When capture is
+// enabled and the user releases the left mouse button, iterate the
+// configured capture methods (UIA, clipboard) in order, stop at the first
+// definitive outcome, then position the floater near the cursor and emit
+// the text payload.
 //
 // rdev::listen blocks for the process lifetime and runs on its own OS thread.
-// Its callback must stay non-blocking, so we offload the clipboard cycle to
-// a worker thread via a single-slot channel.
+// Its callback must stay non-blocking, so we offload selection acquisition
+// to a worker thread via a single-slot channel.
 
 use std::sync::Arc;
 use std::sync::mpsc;
@@ -16,9 +18,11 @@ use rdev::{Button, Event, EventType, listen};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Runtime};
 
+use crate::config::CaptureMethod;
 use crate::error::{AppError, AppResult};
-use crate::selection::is_acceptable_selection;
+use crate::selection::{SelectionOutcome, is_acceptable_selection};
 use crate::state::AppState;
+use crate::uia;
 use crate::window::clamp_to_monitor;
 
 /// Minimum gap between two capture candidates. Guards against double-click
@@ -115,7 +119,10 @@ fn worker_loop<R: Runtime>(
         while let Ok(next) = rx.try_recv() {
             pos = next;
         }
-        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(acquire_selection));
+        let state_ref = state.as_ref();
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            acquire_selection(state_ref)
+        }));
         match outcome {
             Ok(Ok(Some(text))) => {
                 let trimmed = text.trim();
@@ -174,9 +181,48 @@ fn show_floater<R: Runtime>(app: &AppHandle<R>, text: &str, (x, y): (i32, i32)) 
     }
 }
 
-/// Backup clipboard, simulate Ctrl+C, read selection, restore clipboard.
-/// Returns `None` if the clipboard did not change (no active selection).
-fn acquire_selection() -> AppResult<Option<String>> {
+/// Dispatch loop: try each enabled capture method in configured order.
+/// `Text` and `NoSelection` are terminal outcomes; `Unsupported` continues
+/// to the next method. Returns the first text found, or `Ok(None)` when
+/// no method produced one.
+fn acquire_selection(state: &AppState) -> AppResult<Option<String>> {
+    let cfg = state.config();
+    for method in &cfg.capture_methods {
+        let enabled = match method {
+            CaptureMethod::Uia => cfg.uia_enabled,
+            CaptureMethod::Clipboard => cfg.clipboard_enabled,
+        };
+        if !enabled {
+            continue;
+        }
+        let outcome = match method {
+            CaptureMethod::Uia => uia::try_get_selection(),
+            CaptureMethod::Clipboard => try_clipboard(),
+        };
+        match outcome {
+            SelectionOutcome::Text(t) => return Ok(Some(t)),
+            SelectionOutcome::NoSelection => return Ok(None),
+            SelectionOutcome::Unsupported => continue,
+        }
+    }
+    Ok(None)
+}
+
+/// Clipboard capture method: backup clipboard, simulate Ctrl+C, read,
+/// restore. Hard failures degrade to Unsupported so the orchestrator can
+/// try the next method.
+fn try_clipboard() -> SelectionOutcome {
+    match clipboard_cycle() {
+        Ok(Some(t)) => SelectionOutcome::Text(t),
+        Ok(None) => SelectionOutcome::NoSelection,
+        Err(e) => {
+            log::warn!("clipboard capture failed: {e}");
+            SelectionOutcome::Unsupported
+        }
+    }
+}
+
+fn clipboard_cycle() -> AppResult<Option<String>> {
     let mut cb = arboard::Clipboard::new()
         .map_err(|e| AppError::Capture(format!("clipboard open: {e}")))?;
 
@@ -207,23 +253,53 @@ fn acquire_selection() -> AppResult<Option<String>> {
     Ok(candidate)
 }
 
+/// Inject Ctrl+C as a single atomic `SendInput` batch of four events
+/// (Ctrl down, C down, C up, Ctrl up). A single SendInput call is
+/// guaranteed not to be interleaved with other keyboard events, which
+/// prevents IME hooks or real user keys from breaking the modifier state
+/// mid-sequence and leaking a stray 'c' into the focused app.
 fn simulate_copy() -> AppResult<()> {
-    use enigo::{
-        Direction::{Click, Press, Release},
-        Enigo, Key, Keyboard, Settings,
+    use windows::Win32::Foundation::GetLastError;
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYBDINPUT, KEYEVENTF_KEYUP,
+        MAP_VIRTUAL_KEY_TYPE, MapVirtualKeyW, SendInput, VIRTUAL_KEY, VK_CONTROL,
     };
-    let mut enigo = Enigo::new(&Settings::default())
-        .map_err(|e| AppError::Capture(format!("enigo init: {e}")))?;
-    enigo
-        .key(Key::Control, Press)
-        .map_err(|e| AppError::Capture(format!("enigo press ctrl: {e}")))?;
-    let click_result = enigo
-        .key(Key::Unicode('c'), Click)
-        .map_err(|e| AppError::Capture(format!("enigo click c: {e}")));
-    let release_result = enigo
-        .key(Key::Control, Release)
-        .map_err(|e| AppError::Capture(format!("enigo release ctrl: {e}")));
-    click_result?;
-    release_result?;
+
+    const VK_C: VIRTUAL_KEY = VIRTUAL_KEY(0x43);
+    const MAPVK_VK_TO_VSC: MAP_VIRTUAL_KEY_TYPE = MAP_VIRTUAL_KEY_TYPE(0);
+
+    // Pair each virtual key with its scancode so apps that read scancodes
+    // (some games and remote desktops) still see the keypress.
+    let ctrl_scan = unsafe { MapVirtualKeyW(VK_CONTROL.0 as u32, MAPVK_VK_TO_VSC) } as u16;
+    let c_scan = unsafe { MapVirtualKeyW(VK_C.0 as u32, MAPVK_VK_TO_VSC) } as u16;
+
+    let event = |vk: VIRTUAL_KEY, scan: u16, up: bool| INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: vk,
+                wScan: scan,
+                dwFlags: if up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS(0) },
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+
+    let inputs: [INPUT; 4] = [
+        event(VK_CONTROL, ctrl_scan, false),
+        event(VK_C, c_scan, false),
+        event(VK_C, c_scan, true),
+        event(VK_CONTROL, ctrl_scan, true),
+    ];
+
+    let sent = unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
+    if sent as usize != inputs.len() {
+        let err = unsafe { GetLastError() };
+        return Err(AppError::Capture(format!(
+            "SendInput sent {sent}/{} inputs (last error {err:?})",
+            inputs.len()
+        )));
+    }
     Ok(())
 }
