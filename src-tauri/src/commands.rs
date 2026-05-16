@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use serde::Serialize;
 use tauri::{
-    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Runtime, State,
+    AppHandle, Emitter, Manager, PhysicalPosition, Position, Runtime, State,
     async_runtime,
 };
 
@@ -15,10 +15,6 @@ const FLOATER_LABEL: &str = "floater";
 const POPUP_LABEL: &str = "popup";
 
 const POPUP_DROP: i32 = 30;
-
-// Mirror of tauri.conf.json popup size; kept in sync manually.
-const POPUP_W: u32 = 360;
-const POPUP_H: u32 = 260;
 
 #[derive(Clone, Serialize)]
 struct LookupPayload<'a> {
@@ -56,13 +52,13 @@ pub fn request_lookup<R: Runtime>(
         .ok_or_else(|| AppError::Other("popup window not found".into()))?;
     if let Some((x, y)) = state.last_cursor() {
         let anchor = PhysicalPosition::new(x, y + POPUP_DROP);
-
-        // outer_size() is physical pixels and DPI-aware; logical config size is a fallback.
-        let size = popup
-            .outer_size()
-            .unwrap_or(PhysicalSize::new(POPUP_W, POPUP_H));
-        let target = clamp_to_monitor(&app, anchor, size);
-        popup.set_position(Position::Physical(target))?;
+        match popup.outer_size() {
+            Ok(size) => {
+                let target = clamp_to_monitor(&app, anchor, size);
+                popup.set_position(Position::Physical(target))?;
+            }
+            Err(e) => log::warn!("popup outer_size: {e}; skipping reposition"),
+        }
     }
     popup.show()?;
 
