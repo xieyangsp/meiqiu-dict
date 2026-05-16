@@ -51,6 +51,9 @@ pub fn request_lookup<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, Arc<AppState>>,
 ) -> AppResult<()> {
+    // Transition Floater -> Popup before any window operation so that any
+    // mouseup arriving mid-flight is suppressed by the worker.
+    state.enter_popup();
     if let Some(floater) = app.get_webview_window(FLOATER_LABEL) {
         let _ = floater.hide();
     }
@@ -73,4 +76,18 @@ pub fn request_lookup<R: Runtime>(
     popup.set_focus()?;
     app.emit_to(POPUP_LABEL, "lookup-request", LookupPayload { text: &text })?;
     Ok(())
+}
+
+/// Frontend notifies the backend that the floater has hidden itself.
+/// Drives the Floater -> Idle state transition.
+#[tauri::command]
+pub fn notify_floater_hidden(state: State<'_, Arc<AppState>>) {
+    state.floater_hidden();
+}
+
+/// Frontend notifies the backend that the popup has hidden itself.
+/// Drives the Popup -> Idle state transition.
+#[tauri::command]
+pub fn notify_popup_hidden(state: State<'_, Arc<AppState>>) {
+    state.popup_hidden();
 }

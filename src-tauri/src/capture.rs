@@ -21,7 +21,7 @@ use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Runtime
 use crate::config::CaptureMethod;
 use crate::error::{AppError, AppResult};
 use crate::selection::{SelectionOutcome, is_acceptable_selection};
-use crate::state::AppState;
+use crate::state::{AppState, CaptureState};
 use crate::uia;
 use crate::window::clamp_to_monitor;
 
@@ -38,6 +38,11 @@ const COPY_SETTLE: Duration = Duration::from_millis(80);
 const FLOATER_OFFSET: i32 = 12;
 
 const FLOATER_LABEL: &str = "floater";
+
+/// Labels of webview windows whose hit areas should not trigger a capture
+/// cycle. A click on our own UI (floater button, popup body, main window)
+/// must not be treated as the user selecting text in another app.
+const OWN_WINDOW_LABELS: &[&str] = &["floater", "popup", "main"];
 
 /// Declared floater size in tauri.conf.json; kept in sync manually.
 const FLOATER_W: u32 = 88;
@@ -119,6 +124,18 @@ fn worker_loop<R: Runtime>(
         while let Ok(next) = rx.try_recv() {
             pos = next;
         }
+        // State machine gate: do not start a capture cycle while the
+        // popup is active, and never treat clicks on our own UI as text
+        // selections in another app.
+        let current = state.capture_state();
+        if current == CaptureState::Popup {
+            log::debug!("capture skipped: state=Popup at {pos:?}");
+            continue;
+        }
+        if click_on_own_window(&app, pos) {
+            log::debug!("capture skipped: click on our own window at {pos:?}");
+            continue;
+        }
         let state_ref = state.as_ref();
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             acquire_selection(state_ref)
@@ -129,6 +146,7 @@ fn worker_loop<R: Runtime>(
                 if is_acceptable_selection(trimmed) {
                     log::info!("capture acquired: {trimmed:?}");
                     state.set_last_cursor(pos);
+                    state.enter_floater();
                     show_floater(&app, trimmed, pos);
                 }
             }
@@ -150,6 +168,32 @@ fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
     } else {
         "<unknown panic payload>".to_string()
     }
+}
+
+/// Return true if `pos` (physical pixels) falls inside the outer bounds of
+/// any visible webview window we own. Failure to query a window is treated
+/// as a miss so the capture pipeline can still run.
+fn click_on_own_window<R: Runtime>(app: &AppHandle<R>, (x, y): (i32, i32)) -> bool {
+    for label in OWN_WINDOW_LABELS {
+        let Some(win) = app.get_webview_window(label) else {
+            continue;
+        };
+        if !win.is_visible().unwrap_or(false) {
+            continue;
+        }
+        let Ok(origin) = win.outer_position() else {
+            continue;
+        };
+        let Ok(size) = win.outer_size() else {
+            continue;
+        };
+        let w = size.width as i32;
+        let h = size.height as i32;
+        if x >= origin.x && x < origin.x + w && y >= origin.y && y < origin.y + h {
+            return true;
+        }
+    }
+    false
 }
 
 /// Reposition the floater near the cursor and emit the selection text.
