@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 use rdev::{Button, Event, EventType, listen};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Runtime};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, Runtime};
 
 use crate::config::CaptureMethod;
 use crate::error::{AppError, AppResult};
@@ -25,10 +25,6 @@ const FLOATER_LABEL: &str = "floater";
 
 // Clicks inside our own webviews must not start a capture cycle.
 const OWN_WINDOW_LABELS: &[&str] = &["floater", "popup", "main"];
-
-// Mirror of tauri.conf.json floater size; kept in sync manually.
-const FLOATER_W: u32 = 88;
-const FLOATER_H: u32 = 36;
 
 #[derive(Clone, Serialize)]
 struct SelectionPayload<'a> {
@@ -179,14 +175,14 @@ fn show_floater<R: Runtime>(app: &AppHandle<R>, text: &str, (x, y): (i32, i32)) 
         return;
     };
     let anchor = PhysicalPosition::new(x + FLOATER_OFFSET, y + FLOATER_OFFSET);
-
-    // outer_size() is physical pixels and DPI-aware; logical config size is a fallback.
-    let size = win
-        .outer_size()
-        .unwrap_or(PhysicalSize::new(FLOATER_W, FLOATER_H));
-    let target = clamp_to_monitor(app, anchor, size);
-    if let Err(e) = win.set_position(tauri::Position::Physical(target)) {
-        log::warn!("floater set_position: {e}");
+    match win.outer_size() {
+        Ok(size) => {
+            let target = clamp_to_monitor(app, anchor, size);
+            if let Err(e) = win.set_position(tauri::Position::Physical(target)) {
+                log::warn!("floater set_position: {e}");
+            }
+        }
+        Err(e) => log::warn!("floater outer_size: {e}; skipping reposition"),
     }
     if let Err(e) = win.show() {
         log::warn!("floater show: {e}");
