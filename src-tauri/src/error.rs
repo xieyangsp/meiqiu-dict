@@ -32,6 +32,12 @@ pub enum AppError {
 
 pub type AppResult<T> = Result<T, AppError>;
 
+impl AppError {
+    pub fn tray<E: std::fmt::Display>(e: E) -> Self {
+        AppError::Tray(e.to_string())
+    }
+}
+
 impl serde::Serialize for AppError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

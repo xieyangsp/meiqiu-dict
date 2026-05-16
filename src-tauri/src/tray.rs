@@ -27,10 +27,10 @@ struct ToggleMenuItem<R: Runtime>(MenuItem<R>);
 
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> AppResult<TrayIcon<R>> {
     let toggle = MenuItem::with_id(app, MENU_TOGGLE, LABEL_ENABLE, true, None::<&str>)
-        .map_err(|e| AppError::Tray(e.to_string()))?;
+        .map_err(AppError::tray)?;
     let quit = MenuItem::with_id(app, MENU_QUIT, "退出", true, None::<&str>)
-        .map_err(|e| AppError::Tray(e.to_string()))?;
-    let menu = Menu::with_items(app, &[&toggle, &quit]).map_err(|e| AppError::Tray(e.to_string()))?;
+        .map_err(AppError::tray)?;
+    let menu = Menu::with_items(app, &[&toggle, &quit]).map_err(AppError::tray)?;
 
     let tray = TrayIconBuilder::with_id(TRAY_ID)
         .icon(load_icon(false)?)
@@ -39,7 +39,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> AppResult<TrayIcon<R>> {
         .menu(&menu)
         .on_menu_event(handle_menu_event)
         .build(app)
-        .map_err(|e| AppError::Tray(e.to_string()))?;
+        .map_err(AppError::tray)?;
     app.manage(ToggleMenuItem(toggle));
 
     let listen_handle = app.clone();
@@ -61,13 +61,13 @@ fn sync<R: Runtime>(app: &AppHandle<R>, enabled: bool) -> AppResult<()> {
         return Err(AppError::Tray("tray not found".into()));
     };
     tray.set_icon(Some(load_icon(enabled)?))
-        .map_err(|e| AppError::Tray(e.to_string()))?;
+        .map_err(AppError::tray)?;
     tray.set_tooltip(Some(if enabled { TIP_ON } else { TIP_OFF }))
-        .map_err(|e| AppError::Tray(e.to_string()))?;
+        .map_err(AppError::tray)?;
     if let Some(item) = app.try_state::<ToggleMenuItem<R>>() {
         item.0
             .set_text(if enabled { LABEL_DISABLE } else { LABEL_ENABLE })
-            .map_err(|e| AppError::Tray(e.to_string()))?;
+            .map_err(AppError::tray)?;
     }
     Ok(())
 }
