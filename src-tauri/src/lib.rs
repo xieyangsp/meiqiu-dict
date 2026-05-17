@@ -19,6 +19,7 @@ use tauri_plugin_log::{Target, TargetKind};
 
 use crate::error::AppResult;
 use crate::state::{AppState, DictPool};
+use crate::window::MAIN_LABEL;
 
 fn try_open_dict<R: tauri::Runtime>(handle: &tauri::AppHandle<R>) -> AppResult<DictPool> {
     let db_path = handle
@@ -32,6 +33,17 @@ fn try_open_dict<R: tauri::Runtime>(handle: &tauri::AppHandle<R>) -> AppResult<D
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+            log::info!("second instance ignored (args={args:?}, cwd={cwd:?})");
+            if let Some(win) = app.get_webview_window(MAIN_LABEL) {
+                if let Err(e) = win.show() {
+                    log::warn!("single-instance show main: {e}");
+                }
+                if let Err(e) = win.set_focus() {
+                    log::warn!("single-instance focus main: {e}");
+                }
+            }
+        }))
         .plugin(
             tauri_plugin_log::Builder::new()
                 .targets([
