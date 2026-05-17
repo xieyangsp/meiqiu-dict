@@ -4,6 +4,8 @@ import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 
 import type { AppConfig, DictEntry, LookupPayload, SelectionPayload } from './types';
 
+export type TtsAccent = 'en_us' | 'en_gb';
+
 export function onSelectionAcquired(
   cb: (payload: SelectionPayload) => void,
 ): Promise<UnlistenFn> {
@@ -46,6 +48,6 @@ export function setAutostart(enabled: boolean): Promise<void> {
   return invoke('set_autostart', { enabled });
 }
 
-export function speakText(text: string): Promise<void> {
-  return invoke('speak_text', { text });
+export function speakText(text: string, accent: TtsAccent): Promise<void> {
+  return invoke('speak_text', { text, accent });
 }
