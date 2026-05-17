@@ -124,7 +124,10 @@ async function reload() {
       </div>
     </div>
 
-    <p v-if="!config" class="settings-section-title flex-1 px-8 py-8 text-center">加载中…</p>
+    <div v-if="!config" class="flex-1 px-8 py-8 text-center">
+      <p v-if="errorMessage" class="text-red-600">{{ errorMessage }}</p>
+      <p v-else class="settings-section-title">加载中…</p>
+    </div>
 
     <div v-else class="flex-1 overflow-auto">
       <div class="mx-auto max-w-2xl space-y-6 px-8 py-6">
