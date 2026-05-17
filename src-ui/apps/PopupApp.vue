@@ -2,9 +2,10 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 
-import { dictLookup, hidePopup, onLookupRequest, speakText } from '../shared/ipc';
+import { dictLookup, hidePopup, onLookupRequest, onSkinChanged, speakText } from '../shared/ipc';
 import type { DictEntry } from '../shared/types';
 import { resolveSkin } from '../shared/skins';
+import { applySkin } from '../shared/theme';
 import { getConfig } from '../shared/ipc';
 
 const query = ref('');
@@ -14,6 +15,7 @@ const speaking = ref<'en_us' | 'en_gb' | null>(null);
 const errorMessage = ref('');
 const skinTeddy = ref<string>(resolveSkin(null).teddy);
 let unlisten: UnlistenFn | null = null;
+let unlistenSkin: UnlistenFn | null = null;
 
 const translationLines = computed(() => {
   if (!entry.value) return [] as { pos: string | null; body: string }[];
@@ -72,6 +74,11 @@ onMounted(async () => {
   unlisten = await onLookupRequest((payload) => {
     void lookup(payload.text);
   });
+  unlistenSkin = await onSkinChanged((skin) => {
+    const resolved = resolveSkin(skin);
+    skinTeddy.value = resolved.teddy;
+    applySkin(resolved.id);
+  });
   window.addEventListener('keydown', onKeydown);
   try {
     const cfg = await getConfig();
@@ -84,6 +91,9 @@ onMounted(async () => {
 onUnmounted(() => {
   if (unlisten) {
     unlisten();
+  }
+  if (unlistenSkin) {
+    unlistenSkin();
   }
   window.removeEventListener('keydown', onKeydown);
 });

@@ -18,6 +18,10 @@ export function onLookupRequest(
   return listen<LookupPayload>('lookup-request', (event) => cb(event.payload));
 }
 
+export function onSkinChanged(cb: (skin: string) => void): Promise<UnlistenFn> {
+  return listen<string>('skin-changed', (event) => cb(event.payload));
+}
+
 export function requestLookup(text: string): Promise<void> {
   return invoke('request_lookup', { text });
 }

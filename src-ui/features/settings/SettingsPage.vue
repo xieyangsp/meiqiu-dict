@@ -101,11 +101,8 @@ async function reload() {
 </script>
 
 <template>
-  <section
-    class="settings-panel mx-auto my-6 max-w-2xl overflow-hidden rounded-xl text-sm"
-    style="box-shadow: var(--shadow-popup)"
-  >
-    <div class="settings-hero flex items-center gap-3 px-6 py-5">
+  <section class="flex h-full w-full flex-col text-sm">
+    <div class="settings-hero flex items-center gap-3 px-8 py-5">
       <div
         class="flex-shrink-0 overflow-hidden rounded-full"
         style="
@@ -127,118 +124,129 @@ async function reload() {
       </div>
     </div>
 
-    <p v-if="!config" class="px-6 py-8 text-center settings-section-title">加载中…</p>
+    <div v-if="!config" class="flex-1 px-8 py-8 text-center">
+      <p v-if="errorMessage" class="text-red-600">{{ errorMessage }}</p>
+      <p v-else class="settings-section-title">加载中…</p>
+    </div>
 
-    <div v-else class="space-y-6 px-6 py-5">
-      <div class="space-y-2">
-        <label for="hotkey" class="settings-section-title block text-xs font-semibold uppercase tracking-wide">
-          全局热键
-        </label>
-        <input
-          id="hotkey"
-          v-model="config.hotkey"
-          type="text"
-          class="settings-input w-full rounded-lg px-3 py-2 font-mono text-sm"
-          placeholder="CommandOrControl+Alt+T"
-          @input="markDirty"
-        />
-        <p class="settings-section-title text-xs">
-          支持的修饰键：<code>CommandOrControl</code>、<code>Alt</code>、<code>Shift</code>、<code>Super</code>。区分大小写。
-        </p>
-      </div>
-
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-sm font-medium">开机自启</p>
-          <p class="settings-section-title text-xs">Windows 登录后自动启动并常驻托盘</p>
+    <div v-else class="flex-1 overflow-auto">
+      <div class="mx-auto max-w-2xl space-y-6 px-8 py-6">
+        <div class="space-y-2">
+          <label
+            for="hotkey"
+            class="settings-section-title block text-xs font-semibold uppercase tracking-wide"
+          >
+            全局热键
+          </label>
+          <input
+            id="hotkey"
+            v-model="config.hotkey"
+            type="text"
+            class="settings-input w-full rounded-lg px-3 py-2 font-mono text-sm"
+            placeholder="CommandOrControl+Alt+T"
+            @input="markDirty"
+          />
+          <p class="settings-section-title text-xs">
+            支持的修饰键：<code>CommandOrControl</code>、<code>Alt</code>、<code>Shift</code>、<code>Super</code>。区分大小写。
+          </p>
         </div>
-        <button
-          type="button"
-          class="switch"
-          :class="{ on: config.autostart }"
-          :aria-checked="config.autostart"
-          role="switch"
-          @click="onAutostartToggle"
-        />
-      </div>
 
-      <div class="space-y-3">
-        <p class="settings-section-title text-xs font-semibold uppercase tracking-wide">皮肤</p>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium">开机自启</p>
+            <p class="settings-section-title text-xs">Windows 登录后自动启动并常驻托盘</p>
+          </div>
           <button
-            v-for="s in SKINS"
-            :key="s.id"
             type="button"
-            class="skin-dot"
-            :class="{ selected: config.skin === s.id }"
-            :style="{ background: s.swatch }"
-            :title="s.label"
-            @click="pickSkin(s.id)"
+            class="switch"
+            :class="{ on: config.autostart }"
+            :aria-checked="config.autostart"
+            role="switch"
+            @click="onAutostartToggle"
           />
-          <span class="settings-section-title ml-2 text-xs">{{ currentSkin.label }}</span>
+        </div>
+
+        <div class="space-y-3">
+          <p class="settings-section-title text-xs font-semibold uppercase tracking-wide">皮肤</p>
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              v-for="s in SKINS"
+              :key="s.id"
+              type="button"
+              class="skin-dot"
+              :class="{ selected: config.skin === s.id }"
+              :style="{ background: s.swatch }"
+              :title="s.label"
+              @click="pickSkin(s.id)"
+            />
+            <span class="settings-section-title ml-2 text-xs">{{ currentSkin.label }}</span>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <p class="settings-section-title text-xs font-semibold uppercase tracking-wide">
+            划词捕获方式
+          </p>
+          <label class="flex items-center gap-2 text-sm">
+            <input
+              v-model="config.uia_enabled"
+              type="checkbox"
+              class="h-4 w-4"
+              @change="markDirty"
+            />
+            <span>启用 UIA（推荐，无副作用）</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm">
+            <input
+              v-model="config.clipboard_enabled"
+              type="checkbox"
+              class="h-4 w-4"
+              @change="markDirty"
+            />
+            <span>启用剪贴板（模拟 Ctrl+C）</span>
+          </label>
+
+          <div>
+            <p class="settings-section-title text-xs">优先级顺序（从上到下尝试）：</p>
+            <ul class="mt-2 space-y-1">
+              <li
+                v-for="(method, idx) in sortedCaptureMethods"
+                :key="method"
+                class="flex items-center justify-between rounded-lg px-3 py-1.5"
+                style="border: 1px solid var(--popup-border)"
+              >
+                <span class="font-mono text-xs">{{ method }}</span>
+                <span class="space-x-1">
+                  <button
+                    type="button"
+                    class="settings-section-title rounded px-2 text-xs disabled:opacity-30"
+                    :disabled="idx === 0"
+                    @click="moveMethod(method, -1)"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    class="settings-section-title rounded px-2 text-xs disabled:opacity-30"
+                    :disabled="idx === sortedCaptureMethods.length - 1"
+                    @click="moveMethod(method, 1)"
+                  >
+                    ↓
+                  </button>
+                </span>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
+    </div>
 
-      <div class="space-y-3">
-        <p class="settings-section-title text-xs font-semibold uppercase tracking-wide">
-          划词捕获方式
-        </p>
-        <label class="flex items-center gap-2 text-sm">
-          <input
-            v-model="config.uia_enabled"
-            type="checkbox"
-            class="h-4 w-4"
-            @change="markDirty"
-          />
-          <span>启用 UIA（推荐，无副作用）</span>
-        </label>
-        <label class="flex items-center gap-2 text-sm">
-          <input
-            v-model="config.clipboard_enabled"
-            type="checkbox"
-            class="h-4 w-4"
-            @change="markDirty"
-          />
-          <span>启用剪贴板（模拟 Ctrl+C）</span>
-        </label>
-
-        <div>
-          <p class="settings-section-title text-xs">优先级顺序（从上到下尝试）：</p>
-          <ul class="mt-2 space-y-1">
-            <li
-              v-for="(method, idx) in sortedCaptureMethods"
-              :key="method"
-              class="flex items-center justify-between rounded-lg px-3 py-1.5"
-              style="border: 1px solid var(--popup-border)"
-            >
-              <span class="font-mono text-xs">{{ method }}</span>
-              <span class="space-x-1">
-                <button
-                  type="button"
-                  class="settings-section-title rounded px-2 text-xs disabled:opacity-30"
-                  :disabled="idx === 0"
-                  @click="moveMethod(method, -1)"
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  class="settings-section-title rounded px-2 text-xs disabled:opacity-30"
-                  :disabled="idx === sortedCaptureMethods.length - 1"
-                  @click="moveMethod(method, 1)"
-                >
-                  ↓
-                </button>
-              </span>
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <div
-        class="flex items-center justify-between pt-4"
-        style="border-top: 1px solid var(--popup-border)"
-      >
+    <div
+      v-if="config"
+      class="px-8 py-3"
+      style="border-top: 1px solid var(--popup-border)"
+    >
+      <div class="mx-auto flex max-w-2xl items-center justify-between">
         <p v-if="errorMessage" class="text-red-600">{{ errorMessage }}</p>
         <p v-else-if="successMessage" style="color: var(--accent)">{{ successMessage }}</p>
         <p v-else class="settings-section-title">&nbsp;</p>

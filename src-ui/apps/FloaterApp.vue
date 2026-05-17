@@ -2,14 +2,16 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 
-import { getConfig, hideFloater, onSelectionAcquired, requestLookup } from '../shared/ipc';
+import { getConfig, hideFloater, onSelectionAcquired, onSkinChanged, requestLookup } from '../shared/ipc';
 import { resolveSkin } from '../shared/skins';
+import { applySkin } from '../shared/theme';
 
 const AUTO_HIDE_MS = 3000;
 
 const text = ref('');
 const skinTeddy = ref<string>(resolveSkin(null).teddy);
 let unlisten: UnlistenFn | null = null;
+let unlistenSkin: UnlistenFn | null = null;
 let hideTimer: number | null = null;
 
 function scheduleHide() {
@@ -38,6 +40,11 @@ onMounted(async () => {
     text.value = payload.text;
     scheduleHide();
   });
+  unlistenSkin = await onSkinChanged((skin) => {
+    const resolved = resolveSkin(skin);
+    skinTeddy.value = resolved.teddy;
+    applySkin(resolved.id);
+  });
   try {
     const cfg = await getConfig();
     skinTeddy.value = resolveSkin(cfg.skin).teddy;
@@ -49,6 +56,9 @@ onMounted(async () => {
 onUnmounted(() => {
   if (unlisten) {
     unlisten();
+  }
+  if (unlistenSkin) {
+    unlistenSkin();
   }
   if (hideTimer !== null) {
     window.clearTimeout(hideTimer);
