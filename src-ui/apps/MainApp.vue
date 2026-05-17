@@ -23,7 +23,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="h-full overflow-auto bg-white">
+  <main class="h-full overflow-auto" style="background: var(--settings-bg)">
     <SettingsPage />
   </main>
 </template>

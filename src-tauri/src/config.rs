@@ -26,6 +26,8 @@ pub struct AppConfig {
     // Methods run in this order, each gated by its `*_enabled` flag.
     #[serde(default = "default_capture_methods")]
     pub capture_methods: Vec<CaptureMethod>,
+    #[serde(default = "default_skin")]
+    pub skin: String,
 }
 
 fn default_true() -> bool {
@@ -34,6 +36,10 @@ fn default_true() -> bool {
 
 fn default_capture_methods() -> Vec<CaptureMethod> {
     vec![CaptureMethod::Uia, CaptureMethod::Clipboard]
+}
+
+fn default_skin() -> String {
+    "gray".into()
 }
 
 impl Default for AppConfig {
@@ -45,6 +51,7 @@ impl Default for AppConfig {
             uia_enabled: default_true(),
             clipboard_enabled: default_true(),
             capture_methods: default_capture_methods(),
+            skin: default_skin(),
         }
     }
 }
@@ -76,4 +83,22 @@ pub fn save<R: Runtime>(app: &AppHandle<R>, cfg: &AppConfig) -> AppResult<()> {
     let text = serde_json::to_string_pretty(cfg)?;
     fs::write(path, text)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_config_without_skin_parses_with_default() {
+        let json = r#"{
+            "hotkey": "Ctrl+Alt+T",
+            "autostart": false,
+            "tts_voice": null
+        }"#;
+        let cfg: AppConfig = serde_json::from_str(json).expect("legacy config must parse");
+        assert_eq!(cfg.skin, "gray");
+        assert!(cfg.uia_enabled);
+        assert!(cfg.clipboard_enabled);
+    }
 }

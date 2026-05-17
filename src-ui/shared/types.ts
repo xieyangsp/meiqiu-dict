@@ -24,4 +24,5 @@ export interface AppConfig {
   uia_enabled: boolean;
   clipboard_enabled: boolean;
   capture_methods: CaptureMethod[];
+  skin: string;
 }
