@@ -5,7 +5,9 @@ use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, Runtime, State,
     async_runtime,
 };
+use tauri_plugin_autostart::ManagerExt;
 
+use crate::config;
 use crate::dict::{self, DictEntry};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -70,4 +72,28 @@ pub fn notify_floater_hidden(state: State<'_, Arc<AppState>>) {
 #[tauri::command]
 pub fn notify_popup_hidden(state: State<'_, Arc<AppState>>) {
     state.popup_hidden();
+}
+
+#[tauri::command]
+pub fn set_autostart<R: Runtime>(
+    enabled: bool,
+    app: AppHandle<R>,
+    state: State<'_, Arc<AppState>>,
+) -> AppResult<()> {
+    let manager = app.autolaunch();
+    if enabled {
+        manager
+            .enable()
+            .map_err(|e| AppError::Other(format!("autostart enable: {e}")))?;
+    } else {
+        manager
+            .disable()
+            .map_err(|e| AppError::Other(format!("autostart disable: {e}")))?;
+    }
+    let mut cfg = state.config();
+    cfg.autostart = enabled;
+    state.set_config(cfg.clone());
+    config::save(&app, &cfg)?;
+    log::info!("autostart set to {enabled}");
+    Ok(())
 }
