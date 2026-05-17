@@ -14,3 +14,14 @@ export interface DictEntry {
   translation: string;
   lang_pair: string;
 }
+
+export type CaptureMethod = 'uia' | 'clipboard';
+
+export interface AppConfig {
+  hotkey: string;
+  autostart: boolean;
+  tts_voice: string | null;
+  uia_enabled: boolean;
+  clipboard_enabled: boolean;
+  capture_methods: CaptureMethod[];
+}

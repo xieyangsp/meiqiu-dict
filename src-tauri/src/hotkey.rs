@@ -12,10 +12,8 @@ pub fn register<R: Runtime>(app: &AppHandle<R>, accelerator: &str) -> AppResult<
     let shortcut = Shortcut::from_str(accelerator)
         .map_err(|e| AppError::Hotkey(format!("failed to parse accelerator {accelerator}: {e}")))?;
     let gs = app.global_shortcut();
-    if gs.is_registered(shortcut) {
-        gs.unregister(shortcut)
-            .map_err(|e| AppError::Hotkey(e.to_string()))?;
-    }
+    gs.unregister_all()
+        .map_err(|e| AppError::Hotkey(e.to_string()))?;
     gs.on_shortcut(shortcut, on_triggered)
         .map_err(|e| AppError::Hotkey(e.to_string()))?;
     Ok(())

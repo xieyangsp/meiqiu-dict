@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 
-import type { DictEntry, LookupPayload, SelectionPayload } from './types';
+import type { AppConfig, DictEntry, LookupPayload, SelectionPayload } from './types';
 
 export function onSelectionAcquired(
   cb: (payload: SelectionPayload) => void,
@@ -32,4 +32,16 @@ export async function hideFloater(): Promise<void> {
 export async function hidePopup(): Promise<void> {
   await getCurrentWebviewWindow().hide();
   await invoke('notify_popup_hidden');
+}
+
+export function getConfig(): Promise<AppConfig> {
+  return invoke<AppConfig>('get_config');
+}
+
+export function setConfig(cfg: AppConfig): Promise<void> {
+  return invoke('set_config', { cfg });
+}
+
+export function setAutostart(enabled: boolean): Promise<void> {
+  return invoke('set_autostart', { enabled });
 }
