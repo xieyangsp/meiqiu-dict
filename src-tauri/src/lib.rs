@@ -53,12 +53,14 @@ pub fn run() {
                 .level(log::LevelFilter::Info)
                 .build(),
         )
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::dict_lookup,
             commands::request_lookup,
             commands::notify_floater_hidden,
-            commands::notify_popup_hidden
+            commands::notify_popup_hidden,
+            commands::set_autostart
         ])
         .setup(|app| {
             let handle = app.handle();

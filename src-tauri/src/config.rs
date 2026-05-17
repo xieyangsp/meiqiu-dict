@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, Runtime};
 
 use crate::error::{AppError, AppResult};
 
@@ -49,7 +49,7 @@ impl Default for AppConfig {
     }
 }
 
-fn config_path(app: &AppHandle) -> AppResult<PathBuf> {
+fn config_path<R: Runtime>(app: &AppHandle<R>) -> AppResult<PathBuf> {
     let dir = app
         .path()
         .app_config_dir()
@@ -58,7 +58,7 @@ fn config_path(app: &AppHandle) -> AppResult<PathBuf> {
     Ok(dir.join("config.json"))
 }
 
-pub fn load(app: &AppHandle) -> AppResult<AppConfig> {
+pub fn load<R: Runtime>(app: &AppHandle<R>) -> AppResult<AppConfig> {
     let path = config_path(app)?;
     if !path.exists() {
         let cfg = AppConfig::default();
@@ -71,7 +71,7 @@ pub fn load(app: &AppHandle) -> AppResult<AppConfig> {
     Ok(cfg)
 }
 
-pub fn save(app: &AppHandle, cfg: &AppConfig) -> AppResult<()> {
+pub fn save<R: Runtime>(app: &AppHandle<R>, cfg: &AppConfig) -> AppResult<()> {
     let path = config_path(app)?;
     let text = serde_json::to_string_pretty(cfg)?;
     fs::write(path, text)?;
