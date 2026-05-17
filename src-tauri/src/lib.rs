@@ -60,7 +60,9 @@ pub fn run() {
             commands::request_lookup,
             commands::notify_floater_hidden,
             commands::notify_popup_hidden,
-            commands::set_autostart
+            commands::set_autostart,
+            commands::get_config,
+            commands::set_config
         ])
         .setup(|app| {
             let handle = app.handle();

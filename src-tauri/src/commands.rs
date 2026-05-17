@@ -7,9 +7,10 @@ use tauri::{
 };
 use tauri_plugin_autostart::ManagerExt;
 
-use crate::config;
+use crate::config::{self, AppConfig};
 use crate::dict::{self, DictEntry};
 use crate::error::{AppError, AppResult};
+use crate::hotkey;
 use crate::state::AppState;
 use crate::window::{self, FLOATER_LABEL, POPUP_LABEL};
 
@@ -95,5 +96,26 @@ pub fn set_autostart<R: Runtime>(
     state.set_config(cfg.clone());
     config::save(&app, &cfg)?;
     log::info!("autostart set to {enabled}");
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_config(state: State<'_, Arc<AppState>>) -> AppConfig {
+    state.config()
+}
+
+#[tauri::command]
+pub fn set_config<R: Runtime>(
+    cfg: AppConfig,
+    app: AppHandle<R>,
+    state: State<'_, Arc<AppState>>,
+) -> AppResult<()> {
+    let old = state.config();
+    state.set_config(cfg.clone());
+    config::save(&app, &cfg)?;
+    if cfg.hotkey != old.hotkey {
+        hotkey::register(&app, &cfg.hotkey)?;
+        log::info!("hotkey re-registered: {}", cfg.hotkey);
+    }
     Ok(())
 }
