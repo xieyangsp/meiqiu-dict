@@ -13,9 +13,6 @@ src-tauri/gen/
 src-tauri/resources/ecdict.db
 scripts/data/
 
-# Local design previews
-design/
-
 # OS / editors
 .DS_Store
 Thumbs.db
