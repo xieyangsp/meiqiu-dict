@@ -20,7 +20,9 @@ const THROTTLE: Duration = Duration::from_millis(200);
 // Source apps need time to populate CF_UNICODETEXT after Ctrl+C.
 const COPY_SETTLE: Duration = Duration::from_millis(80);
 
-const FLOATER_OFFSET: i32 = 12;
+const FLOATER_NUDGE_X: i32 = 4;
+const FLOATER_NUDGE_Y: i32 = 4;
+const FLOATER_FALLBACK_HEIGHT: i32 = 56;
 
 #[derive(Clone, Serialize)]
 struct SelectionPayload<'a> {
@@ -170,7 +172,11 @@ fn show_floater<R: Runtime>(app: &AppHandle<R>, text: &str, (x, y): (i32, i32)) 
         log::warn!("floater window not found");
         return;
     };
-    let anchor = PhysicalPosition::new(x + FLOATER_OFFSET, y + FLOATER_OFFSET);
+    let h = win
+        .outer_size()
+        .map(|s| s.height as i32)
+        .unwrap_or(FLOATER_FALLBACK_HEIGHT);
+    let anchor = PhysicalPosition::new(x + FLOATER_NUDGE_X, y - h - FLOATER_NUDGE_Y);
     if let Err(e) = window::position_at(app, &win, anchor) {
         log::warn!("floater position_at: {e}");
     }

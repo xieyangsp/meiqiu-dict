@@ -11,6 +11,7 @@ use tauri_plugin_autostart::ManagerExt;
 use crate::config::{self, AppConfig};
 use crate::dict::{self, DictEntry};
 use crate::error::{AppError, AppResult};
+use crate::events;
 use crate::hotkey;
 use crate::state::AppState;
 use crate::window::{self, FLOATER_LABEL, POPUP_LABEL};
@@ -125,6 +126,11 @@ pub fn set_config<R: Runtime>(
     if cfg.hotkey != old.hotkey {
         hotkey::register(&app, &cfg.hotkey)?;
         log::info!("hotkey re-registered: {}", cfg.hotkey);
+    }
+    if cfg.skin != old.skin {
+        if let Err(e) = app.emit(events::SKIN_CHANGED, cfg.skin.clone()) {
+            log::warn!("emit {}: {e}", events::SKIN_CHANGED);
+        }
     }
     Ok(())
 }
