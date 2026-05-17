@@ -2,11 +2,13 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 
-import { hideFloater, onSelectionAcquired, requestLookup } from '../shared/ipc';
+import { getConfig, hideFloater, onSelectionAcquired, requestLookup } from '../shared/ipc';
+import { resolveSkin } from '../shared/skins';
 
 const AUTO_HIDE_MS = 3000;
 
 const text = ref('');
+const skinTeddy = ref<string>(resolveSkin(null).teddy);
 let unlisten: UnlistenFn | null = null;
 let hideTimer: number | null = null;
 
@@ -36,6 +38,12 @@ onMounted(async () => {
     text.value = payload.text;
     scheduleHide();
   });
+  try {
+    const cfg = await getConfig();
+    skinTeddy.value = resolveSkin(cfg.skin).teddy;
+  } catch {
+    /* keep default teddy */
+  }
 });
 
 onUnmounted(() => {
@@ -52,10 +60,18 @@ onUnmounted(() => {
   <div class="flex h-full w-full items-center justify-center">
     <button
       :title="text"
-      class="rounded-full bg-neutral-900/85 px-3 py-1 text-xs text-white shadow hover:bg-neutral-700"
+      class="overflow-hidden rounded-full"
+      style="
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border: 2px solid var(--brand);
+        background: var(--brand);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      "
       @click="onClick"
     >
-      查
+      <img :src="skinTeddy" alt="teddy" class="block h-full w-full object-cover" />
     </button>
   </div>
 </template>

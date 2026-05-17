@@ -131,13 +131,13 @@ pub fn set_config<R: Runtime>(
 
 #[tauri::command]
 pub async fn speak_text(text: String, accent: TtsAccent) -> AppResult<()> {
-    Ok(async_runtime::spawn_blocking(move || {
+    async_runtime::spawn_blocking(move || {
         let accent = match accent {
             TtsAccent::EnUs => tts::Accent::EnUs,
             TtsAccent::EnGb => tts::Accent::EnGb,
         };
         tts::speak_with_accent(&text, accent)
     })
-        .await
-        .map_err(|e| AppError::Other(format!("tts join: {e}")))??)
+    .await
+    .map_err(|e| AppError::Other(format!("tts join: {e}")))?
 }

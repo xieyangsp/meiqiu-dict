@@ -1,6 +1,10 @@
 import { createApp, type Component } from 'vue';
 import { createPinia } from 'pinia';
 import './assets/styles.css';
+import { applyDefaultSkin, applySkinValue } from './shared/theme';
+import { getConfig } from './shared/ipc';
+
+applyDefaultSkin();
 
 const winName = new URLSearchParams(window.location.search).get('win') ?? 'main';
 
@@ -16,4 +20,7 @@ load().then(({ default: Root }) => {
   const app = createApp(Root);
   app.use(createPinia());
   app.mount('#app');
+  void getConfig()
+    .then((cfg) => applySkinValue(cfg.skin))
+    .catch(() => {});
 });
