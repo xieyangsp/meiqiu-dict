@@ -62,8 +62,8 @@ onUnmounted(() => {
       :title="text"
       class="overflow-hidden rounded-full"
       style="
-        width: 36px;
-        height: 36px;
+        width: 40px;
+        height: 40px;
         padding: 0;
         border: 2px solid var(--brand);
         background: var(--brand);

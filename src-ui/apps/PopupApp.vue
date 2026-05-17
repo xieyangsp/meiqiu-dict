@@ -133,6 +133,20 @@ onUnmounted(() => {
               title="英音"
               @click="speak('en_gb')"
             >
+              <svg
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+                style="width: 11px; height: 11px"
+              >
+                <path d="M3 9v6h4l5 5V4L7 9H3z" />
+                <path
+                  d="M16.5 8.5 a4 4 0 0 1 0 7"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+              </svg>
               {{ speaking === 'en_gb' ? '英…' : '英' }}
             </button>
             <button
@@ -142,6 +156,26 @@ onUnmounted(() => {
               title="美音"
               @click="speak('en_us')"
             >
+              <svg
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+                style="width: 11px; height: 11px"
+              >
+                <path d="M3 9v6h4l5 5V4L7 9H3z" />
+                <path
+                  d="M16.5 8.5 a4 4 0 0 1 0 7"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+                <path
+                  d="M19 6.5 a7 7 0 0 1 0 11"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+              </svg>
               {{ speaking === 'en_us' ? '美…' : '美' }}
             </button>
           </div>

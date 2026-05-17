@@ -27,10 +27,11 @@
       {
         "label": "floater",
         "url": "index.html?win=floater",
-        "width": 88,
-        "height": 36,
+        "width": 56,
+        "height": 56,
         "visible": false,
         "decorations": false,
+        "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "resizable": false,
@@ -46,10 +47,11 @@
         "minHeight": 180,
         "visible": false,
         "decorations": false,
+        "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "resizable": true,
-        "shadow": true
+        "shadow": false
       }
     ],
     "security": {
