@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use serde::Deserialize;
 use serde::Serialize;
 use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, Runtime, State,
@@ -13,8 +14,16 @@ use crate::error::{AppError, AppResult};
 use crate::hotkey;
 use crate::state::AppState;
 use crate::window::{self, FLOATER_LABEL, POPUP_LABEL};
+use crate::tts;
 
 const POPUP_DROP: i32 = 30;
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TtsAccent {
+    EnUs,
+    EnGb,
+}
 
 #[derive(Clone, Serialize)]
 struct LookupPayload<'a> {
@@ -118,4 +127,17 @@ pub fn set_config<R: Runtime>(
         log::info!("hotkey re-registered: {}", cfg.hotkey);
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn speak_text(text: String, accent: TtsAccent) -> AppResult<()> {
+    Ok(async_runtime::spawn_blocking(move || {
+        let accent = match accent {
+            TtsAccent::EnUs => tts::Accent::EnUs,
+            TtsAccent::EnGb => tts::Accent::EnGb,
+        };
+        tts::speak_with_accent(&text, accent)
+    })
+        .await
+        .map_err(|e| AppError::Other(format!("tts join: {e}")))??)
 }

@@ -2,12 +2,13 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 
-import { dictLookup, hidePopup, onLookupRequest } from '../shared/ipc';
+import { dictLookup, hidePopup, onLookupRequest, speakText } from '../shared/ipc';
 import type { DictEntry } from '../shared/types';
 
 const query = ref('');
 const entry = ref<DictEntry | null>(null);
 const loading = ref(false);
+const speaking = ref<'en_us' | 'en_gb' | null>(null);
 const errorMessage = ref('');
 let unlisten: UnlistenFn | null = null;
 
@@ -25,6 +26,21 @@ async function lookup(text: string) {
     errorMessage.value = String(e);
   } finally {
     loading.value = false;
+  }
+}
+
+async function speak(accent: 'en_us' | 'en_gb') {
+  const text = entry.value?.word || query.value;
+  if (!text) {
+    return;
+  }
+  speaking.value = accent;
+  try {
+    await speakText(text, accent);
+  } catch (e) {
+    errorMessage.value = String(e);
+  } finally {
+    speaking.value = null;
   }
 }
 
@@ -71,7 +87,27 @@ onUnmounted(() => {
       <p v-if="loading" class="text-neutral-500">查询中…</p>
       <p v-else-if="errorMessage" class="text-red-600">{{ errorMessage }}</p>
       <template v-else-if="entry">
-        <h2 class="text-base font-semibold text-neutral-900">{{ entry.word }}</h2>
+        <div class="flex items-center justify-between gap-2">
+          <h2 class="text-base font-semibold text-neutral-900">{{ entry.word }}</h2>
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              class="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+              :disabled="speaking !== null"
+              @click="speak('en_gb')"
+            >
+              {{ speaking === 'en_gb' ? '英音…' : '英音' }}
+            </button>
+            <button
+              type="button"
+              class="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+              :disabled="speaking !== null"
+              @click="speak('en_us')"
+            >
+              {{ speaking === 'en_us' ? '美音…' : '美音' }}
+            </button>
+          </div>
+        </div>
         <p v-if="entry.phonetic" class="mt-0.5 text-xs text-neutral-500">/{{ entry.phonetic }}/</p>
         <pre
           class="mt-2 whitespace-pre-wrap break-words font-sans text-sm text-neutral-800"
