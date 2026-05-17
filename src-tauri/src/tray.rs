@@ -2,21 +2,24 @@ use std::sync::Arc;
 
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuEvent, MenuItem};
-use tauri::tray::{TrayIcon, TrayIconBuilder};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Listener, Manager, Runtime};
 
 use crate::error::{AppError, AppResult};
 use crate::events;
 use crate::state::AppState;
+use crate::window::MAIN_LABEL;
 
 pub const TRAY_ID: &str = "main-tray";
 
 const ICON_ACTIVE: &[u8] = include_bytes!("../icons/tray-active.png");
 const ICON_IDLE: &[u8] = include_bytes!("../icons/tray-idle.png");
 
+const MENU_SETTINGS: &str = "open_settings";
 const MENU_TOGGLE: &str = "toggle_capture";
 const MENU_QUIT: &str = "quit";
 
+const LABEL_SETTINGS: &str = "打开设置";
 const LABEL_ENABLE: &str = "启用划词监听";
 const LABEL_DISABLE: &str = "关闭划词监听";
 const TIP_ON: &str = "煤球词典 — 划词监听：开";
@@ -26,11 +29,13 @@ const TIP_OFF: &str = "煤球词典 — 划词监听：关";
 struct ToggleMenuItem<R: Runtime>(MenuItem<R>);
 
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> AppResult<TrayIcon<R>> {
+    let settings = MenuItem::with_id(app, MENU_SETTINGS, LABEL_SETTINGS, true, None::<&str>)
+        .map_err(AppError::tray)?;
     let toggle = MenuItem::with_id(app, MENU_TOGGLE, LABEL_ENABLE, true, None::<&str>)
         .map_err(AppError::tray)?;
     let quit = MenuItem::with_id(app, MENU_QUIT, "退出", true, None::<&str>)
         .map_err(AppError::tray)?;
-    let menu = Menu::with_items(app, &[&toggle, &quit]).map_err(AppError::tray)?;
+    let menu = Menu::with_items(app, &[&settings, &toggle, &quit]).map_err(AppError::tray)?;
 
     let tray = TrayIconBuilder::with_id(TRAY_ID)
         .icon(load_icon(false)?)
@@ -38,6 +43,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> AppResult<TrayIcon<R>> {
         .tooltip(TIP_OFF)
         .menu(&menu)
         .on_menu_event(handle_menu_event)
+        .on_tray_icon_event(handle_tray_icon_event)
         .build(app)
         .map_err(AppError::tray)?;
     app.manage(ToggleMenuItem(toggle));
@@ -79,6 +85,7 @@ fn load_icon(active: bool) -> AppResult<Image<'static>> {
 
 fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
     match event.id().as_ref() {
+        MENU_SETTINGS => show_main_window(app),
         MENU_TOGGLE => {
             if let Some(state) = app.try_state::<Arc<AppState>>() {
                 let enabled = state.toggle_capture();
@@ -90,5 +97,29 @@ fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         }
         MENU_QUIT => app.exit(0),
         _ => {}
+    }
+}
+
+fn handle_tray_icon_event<R: Runtime>(tray: &TrayIcon<R>, event: TrayIconEvent) {
+    if let TrayIconEvent::Click {
+        button: MouseButton::Left,
+        button_state: MouseButtonState::Up,
+        ..
+    } = event
+    {
+        show_main_window(tray.app_handle());
+    }
+}
+
+fn show_main_window<R: Runtime>(app: &AppHandle<R>) {
+    let Some(win) = app.get_webview_window(MAIN_LABEL) else {
+        log::warn!("main window not found");
+        return;
+    };
+    if let Err(e) = win.show() {
+        log::warn!("main show: {e}");
+    }
+    if let Err(e) = win.set_focus() {
+        log::warn!("main set_focus: {e}");
     }
 }
