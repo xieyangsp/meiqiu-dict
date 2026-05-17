@@ -13,6 +13,7 @@ use crate::error::{AppError, AppResult};
 use crate::hotkey;
 use crate::state::AppState;
 use crate::window::{self, FLOATER_LABEL, POPUP_LABEL};
+use crate::tts;
 
 const POPUP_DROP: i32 = 30;
 
@@ -118,4 +119,11 @@ pub fn set_config<R: Runtime>(
         log::info!("hotkey re-registered: {}", cfg.hotkey);
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn speak_text(text: String) -> AppResult<()> {
+    Ok(async_runtime::spawn_blocking(move || tts::speak(&text))
+        .await
+        .map_err(|e| AppError::Other(format!("tts join: {e}")))??)
 }

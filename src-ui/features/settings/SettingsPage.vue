@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 
-import { getConfig, setAutostart, setConfig } from '../../shared/ipc';
+import { getConfig, setAutostart, setConfig, speakText } from '../../shared/ipc';
 import type { AppConfig, CaptureMethod } from '../../shared/types';
 
 const config = ref<AppConfig | null>(null);
 const saving = ref(false);
+const speaking = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
 
 const isDirty = ref(false);
 const dirtyAutostart = ref(false);
 const originalAutostart = ref(false);
+const sampleText = ref('hello');
 
 const sortedCaptureMethods = computed<CaptureMethod[]>(() => {
   if (!config.value) return [];
@@ -84,6 +86,20 @@ async function reload() {
     isDirty.value = false;
   } catch (e) {
     errorMessage.value = String(e);
+  }
+}
+
+async function testSpeech() {
+  speaking.value = true;
+  errorMessage.value = '';
+  successMessage.value = '';
+  try {
+    await speakText(sampleText.value);
+    successMessage.value = '已发音';
+  } catch (e) {
+    errorMessage.value = String(e);
+  } finally {
+    speaking.value = false;
   }
 }
 </script>
@@ -182,6 +198,29 @@ async function reload() {
               </span>
             </li>
           </ul>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <p class="font-medium">语音测试</p>
+        <div class="space-y-2">
+          <input
+            v-model="sampleText"
+            type="text"
+            class="w-full rounded border border-neutral-300 px-3 py-1.5 text-sm focus:border-neutral-500 focus:outline-none"
+            placeholder="输入要朗读的文本"
+          />
+          <p class="text-xs text-neutral-500">当前先使用 Windows SAPI 默认语音。</p>
+        </div>
+        <div>
+          <button
+            type="button"
+            class="rounded border border-neutral-300 px-3 py-1.5 text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+            :disabled="speaking || !sampleText.trim()"
+            @click="testSpeech"
+          >
+            {{ speaking ? '播报中…' : '试听发音' }}
+          </button>
         </div>
       </div>
 

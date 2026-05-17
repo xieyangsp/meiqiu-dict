@@ -8,6 +8,7 @@ mod hotkey;
 mod selection;
 mod state;
 mod tray;
+mod tts;
 mod uia;
 mod window;
 
@@ -62,7 +63,8 @@ pub fn run() {
             commands::notify_popup_hidden,
             commands::set_autostart,
             commands::get_config,
-            commands::set_config
+            commands::set_config,
+            commands::speak_text
         ])
         .setup(|app| {
             let handle = app.handle();

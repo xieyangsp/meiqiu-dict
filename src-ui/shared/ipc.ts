@@ -45,3 +45,7 @@ export function setConfig(cfg: AppConfig): Promise<void> {
 export function setAutostart(enabled: boolean): Promise<void> {
   return invoke('set_autostart', { enabled });
 }
+
+export function speakText(text: string): Promise<void> {
+  return invoke('speak_text', { text });
+}
