@@ -30,12 +30,12 @@ meiqiu-dict/
     ├── Cargo.toml  build.rs  tauri.conf.json
     ├── capabilities/                   # Tauri 2 capability files
     ├── icons/  resources/              # Icons + bundled ECDICT db
-    └── src/{main,lib,error,state,config,dict,capture,selection,hotkey,tray,window,commands}.rs
+    └── src/{main,lib,error,state,config,events,dict,capture,selection,uia,hotkey,tray,tts,window,commands}.rs
 ```
 
 - Single HTML: `index.html` is shared by every window; the right Vue app is chosen by the query string `?win=main|floater|popup`.
 - Window labels must match `src-tauri/capabilities/default.json -> windows`.
-- Planned but not yet present: `src-tauri/src/tts.rs` (lands with the TTS milestone).
+- `src-tauri/src/uia.rs` holds the Windows UI Automation selection probe used by `capture`; treat it as a private helper of the capture pipeline (not its own tier).
 
 ## Architecture
 
@@ -146,12 +146,12 @@ docs(agents): add PR title convention
 
 ## Roadmap (reminder; never embed in code)
 
-1. Tray and hotkey skeleton.
-2. Dictionary lookup: ECDICT -> SQLite, rusqlite plus an r2d2 pool.
-3. Capture pipeline: rdev mouse hook, arboard/enigo clipboard cycle, floater window.
-4. TTS: Windows SAPI or Edge TTS (decision pending).
-5. System integration: autostart, single-instance, settings UI.
-6. Packaging: NSIS installer, optional code signing.
+1. Tray and hotkey skeleton. **Done.**
+2. Dictionary lookup: ECDICT -> SQLite, rusqlite plus an r2d2 pool. **Done.**
+3. Capture pipeline: rdev mouse hook, arboard/enigo clipboard cycle, floater window. **Done.**
+4. TTS: Windows SAPI via `ISpVoice`; SSML `xml:lang` switches en-US / en-GB. Pronunciation buttons live on the popup. **Done.**
+5. System integration: autostart, single-instance, settings UI. **Done.**
+6. Packaging: NSIS installer, optional code signing. **Pending.**
 
 Detailed decisions live in `/memories/repo/meiqiu-dict.md`.
 
